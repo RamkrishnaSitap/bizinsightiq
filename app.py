@@ -54,6 +54,32 @@ from src.insights import (
 DEFAULT_SAMPLE_PATH = Path("data/sample_sales_data.csv")
 
 
+def format_currency(val: float, mode: str | None = None, convert: bool | None = None, rate: float = 83.0) -> str:
+    """
+    Format monetary amounts according to user-selected currency configuration.
+
+    Modes:
+    - 'Rupees (₹)' (Default)
+    - 'Both (₹ & $)'
+    - 'US Dollars ($)'
+    """
+    if pd.isna(val):
+        return "-"
+    if mode is None:
+        mode = st.session_state.get("currency_mode", "Rupees (₹)")
+    if convert is None:
+        convert = st.session_state.get("convert_currency", False)
+
+    if mode == "Rupees (₹)":
+        amt = val * rate if convert else val
+        return f"₹{amt:,.2f}"
+    elif mode == "US Dollars ($)":
+        return f"${val:,.2f}"
+    else:  # "Both (₹ & $)"
+        inr_amt = val * rate if convert else val
+        return f"₹{inr_amt:,.2f} (${val:,.2f})"
+
+
 def set_page_layout() -> None:
     """Configure page settings and theme layout."""
     st.set_page_config(
@@ -130,7 +156,23 @@ def render_sidebar() -> tuple[pd.DataFrame | None, str]:
         st.sidebar.markdown(f"- `{col}`")
 
     st.sidebar.markdown("---")
-    st.sidebar.caption("**Status:** Day 5 Completed (Decision Support & Actionable Insights Engine)")
+    st.sidebar.header("💱 Currency Configuration")
+    currency_mode = st.sidebar.radio(
+        "Display Currency:",
+        options=["Rupees (₹)", "Both (₹ & $)", "US Dollars ($)"],
+        index=0,
+        help="Configure whether monetary values are displayed in Indian Rupees (₹) [Default], US Dollars ($), or Both."
+    )
+    convert_currency = st.sidebar.checkbox(
+        "Apply USD → INR Conversion (1 USD = ₹83.00)",
+        value=False,
+        help="When enabled, converts USD values to INR at 1 USD = ₹83.00. When disabled, amounts are formatted directly with the chosen symbol."
+    )
+    st.session_state["currency_mode"] = currency_mode
+    st.session_state["convert_currency"] = convert_currency
+
+    st.sidebar.markdown("---")
+    st.sidebar.caption("**Status:** Day 6 Completed (MCA Academic Deliverables & System Verification)")
 
     return df, source_name
 
@@ -244,9 +286,9 @@ def render_eda_tab(df: pd.DataFrame) -> None:
     kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5, kpi_col6 = st.columns(6)
 
     with kpi_col1:
-        st.metric("Total Revenue", f"${kpis['total_sales']:,.2f}")
+        st.metric("Total Revenue", format_currency(kpis['total_sales']))
     with kpi_col2:
-        st.metric("Total Profit", f"${kpis['total_profit']:,.2f}")
+        st.metric("Total Profit", format_currency(kpis['total_profit']))
     with kpi_col3:
         st.metric("Profit Margin", f"{kpis['profit_margin_pct']:.1f}%")
     with kpi_col4:
@@ -254,7 +296,7 @@ def render_eda_tab(df: pd.DataFrame) -> None:
     with kpi_col5:
         st.metric("Unique Customers", f"{kpis['unique_customers']:,}")
     with kpi_col6:
-        st.metric("Avg Order Value", f"${kpis['avg_order_value']:,.2f}")
+        st.metric("Avg Order Value", format_currency(kpis['avg_order_value']))
 
     st.divider()
 
@@ -275,7 +317,12 @@ def render_eda_tab(df: pd.DataFrame) -> None:
         cat_fig = create_category_bar_chart(cat_df)
         st.plotly_chart(cat_fig, use_container_width=True)
         with st.expander("View Category Breakdown Table"):
-            st.dataframe(cat_df, use_container_width=True)
+            fmt_cat_df = cat_df.copy()
+            if "Sales" in fmt_cat_df.columns:
+                fmt_cat_df["Sales"] = fmt_cat_df["Sales"].apply(format_currency)
+            if "Profit" in fmt_cat_df.columns:
+                fmt_cat_df["Profit"] = fmt_cat_df["Profit"].apply(format_currency)
+            st.dataframe(fmt_cat_df, use_container_width=True)
 
     with col_reg:
         st.markdown("#### 3. Regional Sales Distribution")
@@ -283,7 +330,12 @@ def render_eda_tab(df: pd.DataFrame) -> None:
         reg_fig = create_region_pie_chart(reg_df)
         st.plotly_chart(reg_fig, use_container_width=True)
         with st.expander("View Regional Breakdown Table"):
-            st.dataframe(reg_df, use_container_width=True)
+            fmt_reg_df = reg_df.copy()
+            if "Sales" in fmt_reg_df.columns:
+                fmt_reg_df["Sales"] = fmt_reg_df["Sales"].apply(format_currency)
+            if "Profit" in fmt_reg_df.columns:
+                fmt_reg_df["Profit"] = fmt_reg_df["Profit"].apply(format_currency)
+            st.dataframe(fmt_reg_df, use_container_width=True)
 
     st.divider()
 
@@ -297,7 +349,11 @@ def render_eda_tab(df: pd.DataFrame) -> None:
 
         st.caption("Discount Tier Aggregate Performance:")
         disc_table = compute_discount_profitability_analysis(filtered_df)
-        st.dataframe(disc_table, use_container_width=True)
+        fmt_disc = disc_table.copy()
+        for col_name in ["Sales", "Profit", "Gross Sales", "Net Profit"]:
+            if col_name in fmt_disc.columns:
+                fmt_disc[col_name] = fmt_disc[col_name].apply(format_currency)
+        st.dataframe(fmt_disc, use_container_width=True)
 
     with col_corr:
         st.markdown("#### 5. Feature Correlation Matrix")
@@ -345,14 +401,17 @@ def render_segmentation_tab(df: pd.DataFrame) -> None:
     with m1:
         st.metric("Total Customers", f"{n_customers:,}")
     with m2:
-        st.metric("Median Customer Spend", f"${customer_df['MonetaryValue'].median():,.2f}")
+        st.metric("Median Customer Spend", format_currency(customer_df['MonetaryValue'].median()))
     with m3:
         st.metric("Median Recency", f"{int(customer_df['Recency'].median())} days")
     with m4:
         st.metric("Median Discount", f"{customer_df['AvgDiscount'].median() * 100.0:.1f}%")
 
     with st.expander("📋 View Customer-Level Aggregated Feature Table (First 10 records)"):
-        st.dataframe(customer_df.head(10), use_container_width=True)
+        fmt_cust_df = customer_df.head(10).copy()
+        if "MonetaryValue" in fmt_cust_df.columns:
+            fmt_cust_df["MonetaryValue"] = fmt_cust_df["MonetaryValue"].apply(format_currency)
+        st.dataframe(fmt_cust_df, use_container_width=True)
 
     st.divider()
 
@@ -421,7 +480,12 @@ def render_segmentation_tab(df: pd.DataFrame) -> None:
     st.markdown("#### 3. Segment Characteristics & Behavioral Profiles")
     profile_df = generate_cluster_profiles(clustering_result["clustered_df"])
 
-    st.dataframe(profile_df, use_container_width=True)
+    fmt_profile = profile_df.copy()
+    if "MeanSales" in fmt_profile.columns:
+        fmt_profile["MeanSales"] = fmt_profile["MeanSales"].apply(format_currency)
+    if "MeanProfit" in fmt_profile.columns:
+        fmt_profile["MeanProfit"] = fmt_profile["MeanProfit"].apply(format_currency)
+    st.dataframe(fmt_profile, use_container_width=True)
 
     # Profile Bar Chart
     prof_fig = create_cluster_profile_bar_chart(profile_df)
@@ -439,8 +503,8 @@ def render_segmentation_tab(df: pd.DataFrame) -> None:
                     <h4 style="margin:0;">Cluster {c_num}</h4>
                     <p style="color:#d69e2e; font-weight:bold; margin-bottom:8px;">{row['DescriptivePersona']}</p>
                     <p style="margin:2px 0;"><b>Size:</b> {row['CustomerCount']} ({row['CustomerPct']}%)</p>
-                    <p style="margin:2px 0;"><b>Avg Spend:</b> ${row['MeanSales']:,.2f}</p>
-                    <p style="margin:2px 0;"><b>Avg Profit:</b> ${row['MeanProfit']:,.2f}</p>
+                    <p style="margin:2px 0;"><b>Avg Spend:</b> {format_currency(row['MeanSales'])}</p>
+                    <p style="margin:2px 0;"><b>Avg Profit:</b> {format_currency(row['MeanProfit'])}</p>
                     <p style="margin:2px 0;"><b>Margin:</b> {row['ProfitMarginPct']:.1f}%</p>
                     <p style="margin:2px 0;"><b>Avg Recency:</b> {row['MeanRecencyDays']:.0f} days</p>
                     <p style="margin:2px 0;"><b>Avg Discount:</b> {row['MeanDiscountPct']:.1f}%</p>
@@ -524,16 +588,16 @@ def render_prediction_tab(df: pd.DataFrame) -> None:
     with m_col2:
         st.metric(
             label="Random Forest MAE",
-            value=f"${eval_rf['mae']:,.2f}",
-            delta=f"-${eval_lr['mae'] - eval_rf['mae']:,.2f} vs LR",
+            value=format_currency(eval_rf['mae']),
+            delta=f"-{format_currency(eval_lr['mae'] - eval_rf['mae'])} vs LR",
             delta_color="inverse",
-            help="Mean Absolute Error: Average dollar deviation from actual sales."
+            help="Mean Absolute Error: Average deviation from actual sales in selected currency."
         )
     with m_col3:
         st.metric(
             label="Random Forest RMSE",
-            value=f"${eval_rf['rmse']:,.2f}",
-            delta=f"-${eval_lr['rmse'] - eval_rf['rmse']:,.2f} vs LR",
+            value=format_currency(eval_rf['rmse']),
+            delta=f"-{format_currency(eval_lr['rmse'] - eval_rf['rmse'])} vs LR",
             delta_color="inverse",
             help="Root Mean Squared Error: Penalizes larger prediction errors."
         )
@@ -555,7 +619,13 @@ def render_prediction_tab(df: pd.DataFrame) -> None:
     ])
 
     with c_tab1:
-        st.dataframe(comparison_df, use_container_width=True)
+        fmt_comp = comparison_df.copy()
+        curr_label = "₹" if st.session_state.get("currency_mode", "Rupees (₹)") == "Rupees (₹)" else ("₹ / $" if "Both" in st.session_state.get("currency_mode", "") else "$")
+        if "MAE ($)" in fmt_comp.columns and "RMSE ($)" in fmt_comp.columns:
+            fmt_comp[f"MAE ({curr_label})"] = fmt_comp["MAE ($)"].apply(format_currency)
+            fmt_comp[f"RMSE ({curr_label})"] = fmt_comp["RMSE ($)"].apply(format_currency)
+            fmt_comp = fmt_comp.drop(columns=["MAE ($)", "RMSE ($)"])
+        st.dataframe(fmt_comp, use_container_width=True)
         comp_fig = create_model_comparison_bar_chart(comparison_df)
         st.plotly_chart(comp_fig, use_container_width=True)
 
@@ -649,12 +719,12 @@ def render_prediction_tab(df: pd.DataFrame) -> None:
     with res_card1:
         st.metric(
             label=f"Predicted Gross Sales ({model_engine.split(' ')[0]} {model_engine.split(' ')[1]})",
-            value=f"${pred_val:,.2f}"
+            value=format_currency(pred_val)
         )
     with res_card2:
         st.metric(
             label="Implied Unit Realization",
-            value=f"${implied_unit_price:,.2f} / unit"
+            value=f"{format_currency(implied_unit_price)} / unit"
         )
     with res_card3:
         st.metric(
@@ -770,7 +840,10 @@ def render_insights_tab(df: pd.DataFrame) -> None:
         evidence_lines = []
         for k, v in ins.evidence.items():
             k_formatted = k.replace("_", " ").title()
-            if isinstance(v, float):
+            is_monetary = any(term in k.lower() for term in ["sales", "profit", "spend", "loss", "revenue", "cogs", "price"]) and not any(term in k.lower() for term in ["pct", "margin", "ratio", "count", "days"])
+            if isinstance(v, (int, float)) and is_monetary:
+                v_formatted = format_currency(v)
+            elif isinstance(v, float):
                 v_formatted = f"{v:,.2f}"
             elif isinstance(v, int):
                 v_formatted = f"{v:,}"
