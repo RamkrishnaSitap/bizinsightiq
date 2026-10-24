@@ -123,10 +123,12 @@ MCA_AI_ML_Project_and_Report/
     │   ├── __init__.py          # Package initializer
     │   ├── data_loader.py       # Robust CSV loading utility
     │   ├── validator.py         # Schema and business rule validation engine
-    │   └── eda.py               # Framework-agnostic EDA computations & charts
+    │   ├── eda.py               # Framework-agnostic EDA computations & charts
+    │   └── segmentation.py      # K-Means clustering, PCA projection, & profiling
     └── tests/
         ├── test_validation.py   # Pytest automated test suite (15 test cases)
-        └── test_eda.py          # Pytest EDA analytical test suite (16 test cases)
+        ├── test_eda.py          # Pytest EDA analytical test suite (16 test cases)
+        └── test_ml_segmentation.py # Pytest customer segmentation test suite (17 test cases)
 ```
 
 ---
@@ -135,7 +137,7 @@ MCA_AI_ML_Project_and_Report/
 
 - [x] **Day 1 (Completed):** Python 3.12 environment setup, reproducible sample dataset generation (1,200 rows), CSV data loader, data validator, Pytest test suite (15 passed), and initial Streamlit dashboard skeleton.
 - [x] **Day 2 (Completed):** Framework-agnostic EDA engine (`src/eda.py`), interactive Plotly visualizers (Sales Trends, Category Performance, Regional Distributions, Discount Impact, Correlation Heatmap), full UI integration in `app.py`, and 31 passed unit tests.
-- [ ] **Day 3 (Next):** Unsupervised Machine Learning — K-Means Customer Segmentation (`src/segmentation.py`) with Elbow Method and Silhouette evaluation.
-- [ ] **Day 4:** Supervised Machine Learning — Sales Prediction Regression models (`src/prediction.py`) with $R^2$, RMSE, and MAE evaluation metrics.
+- [x] **Day 3 (Completed):** Unsupervised Machine Learning — Customer Segmentation Engine (`src/segmentation.py`) using Scikit-learn K-Means, RFM feature aggregation, StandardScaler, Elbow/Silhouette diagnostics, 2D PCA visual projection, persona profiling, dashboard integration, and 48 passed unit tests.
+- [ ] **Day 4 (Next):** Supervised Machine Learning — Sales Prediction Regression models (`src/prediction.py`) with $R^2$, RMSE, and MAE evaluation metrics.
 - [ ] **Day 5:** Decision Support Engine — Automated business insight generation and full UI integration.
 - [ ] **Day 6:** Final End-to-End System Verification, Performance Tables, and MCA Project Report Evidence compilation.

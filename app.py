@@ -1,7 +1,7 @@
 """
 BizInsightIQ — AI-Powered Business Intelligence, Predictive Analytics & Decision Support System
 MCA Final-Semester Project - Streamlit Application Dashboard
-Day 2: Exploratory Data Analysis (EDA), Interactive Visualizations & Modular Architecture
+Day 3: AI/ML Customer Segmentation (K-Means, RFM Analysis & PCA Projection)
 """
 
 from pathlib import Path
@@ -22,6 +22,15 @@ from src.eda import (
     create_region_pie_chart,
     create_discount_profit_scatter,
     create_correlation_heatmap,
+)
+from src.segmentation import (
+    aggregate_customer_features,
+    perform_kmeans_clustering,
+    evaluate_cluster_candidates,
+    generate_cluster_profiles,
+    create_elbow_silhouette_chart,
+    create_pca_cluster_chart,
+    create_cluster_profile_bar_chart,
 )
 
 
@@ -104,7 +113,7 @@ def render_sidebar() -> tuple[pd.DataFrame | None, str]:
         st.sidebar.markdown(f"- `{col}`")
 
     st.sidebar.markdown("---")
-    st.sidebar.caption("**Status:** Day 2 Completed (EDA & Interactive Analytics)")
+    st.sidebar.caption("**Status:** Day 3 Completed (Customer Segmentation ML)")
 
     return df, source_name
 
@@ -286,8 +295,146 @@ def render_eda_tab(df: pd.DataFrame) -> None:
         )
 
 
+def render_segmentation_tab(df: pd.DataFrame) -> None:
+    """Render Unsupervised Customer Segmentation dashboard powered by Scikit-learn K-Means."""
+    st.markdown("### 🎯 Unsupervised Customer Segmentation (K-Means)")
+    st.caption("Behavioral & RFM Customer Clustering implemented via decoupled algorithms in `src/segmentation.py`.")
+
+    # Important Academic Disclaimers and Limitations
+    st.info(
+        """
+        ℹ️ **Methodology & Data Notes:**
+        - **Frequency Definition:** In the absence of an explicit `OrderID` attribute in the dataset schema, transaction-row count serves as a proxy for purchase frequency.
+        - **Recency Calculation:** Computed deterministically relative to one day post-dataset maximum transaction date (`2024-12-31`).
+        - **Synthetic Data Notice:** Clusters reflect synthetic behavioral distributions generated for academic research demonstration.
+        - **Cluster Labels:** Cluster numbers (0, 1, 2...) are arbitrary categorical identifiers, not rankings or quality scores.
+        """
+    )
+
+    # 1. Feature Aggregation
+    try:
+        customer_df = aggregate_customer_features(df)
+    except Exception as e:
+        st.error(f"Error computing customer features: {e}")
+        return
+
+    n_customers = len(customer_df)
+    if n_customers < 4:
+        st.warning(f"Insufficient customer observations ({n_customers}) to perform reliable clustering.")
+        return
+
+    # Top-level Customer Metrics
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.metric("Total Customers", f"{n_customers:,}")
+    with m2:
+        st.metric("Median Customer Spend", f"${customer_df['MonetaryValue'].median():,.2f}")
+    with m3:
+        st.metric("Median Recency", f"{int(customer_df['Recency'].median())} days")
+    with m4:
+        st.metric("Median Discount", f"{customer_df['AvgDiscount'].median() * 100.0:.1f}%")
+
+    with st.expander("📋 View Customer-Level Aggregated Feature Table (First 10 records)"):
+        st.dataframe(customer_df.head(10), use_container_width=True)
+
+    st.divider()
+
+    # 2. Diagnostic Evaluation: Elbow Method & Silhouette Curve
+    with st.expander("📈 View Cluster Diagnostic Analysis (Elbow Method & Silhouette Curves)", expanded=False):
+        st.caption("Evaluates cluster compact-ness (Inertia) and cluster separation (Silhouette Score) across candidate values of k.")
+        eval_df = evaluate_cluster_candidates(customer_df, k_min=2, k_max=min(7, n_customers - 1))
+        diag_fig = create_elbow_silhouette_chart(eval_df)
+        st.plotly_chart(diag_fig, use_container_width=True)
+        st.caption(
+            "💡 **Interpretation:** The optimal number of clusters typically corresponds to the 'elbow' inflection point "
+            "in Inertia accompanied by a healthy Silhouette Score (typically > 0.30)."
+        )
+
+    # 3. Model Controls & Execution
+    st.markdown("#### 1. Configure Clustering Parameters")
+    ctrl_col1, ctrl_col2 = st.columns([1, 2])
+
+    with ctrl_col1:
+        k_val = st.slider(
+            "Select Number of Clusters (k):",
+            min_value=2,
+            max_value=min(7, n_customers - 1),
+            value=4,
+            step=1,
+            help="Choose the number of customer behavioral segments to form."
+        )
+
+    # Execute clustering
+    try:
+        clustering_result = perform_kmeans_clustering(customer_df, n_clusters=k_val, random_state=42)
+    except Exception as e:
+        st.error(f"Clustering execution error: {e}")
+        return
+
+    sil_score = clustering_result["silhouette_score"]
+    inertia = clustering_result["inertia"]
+    var_ratio = clustering_result["pca_variance_ratio"]
+
+    with ctrl_col2:
+        st.markdown("**Model Evaluation Diagnostics:**")
+        d1, d2, d3 = st.columns(3)
+        with d1:
+            st.metric("Within-Cluster Inertia", f"{inertia:,.1f}")
+        with d2:
+            sil_str = f"{sil_score:.3f}" if sil_score is not None else "N/A"
+            st.metric("Silhouette Score", sil_str)
+        with d3:
+            st.metric("2D PCA Variance", f"{sum(var_ratio):.1f}%")
+
+    st.divider()
+
+    # 4. 2D Visual Cluster Projection (PCA)
+    st.markdown("#### 2. Two-Dimensional Customer Cluster Projection (PCA)")
+    st.caption(
+        f"Multi-dimensional customer features (Recency, Frequency, Spend, Profit, Discount, Quantity) "
+        f"projected onto top 2 Principal Components. Component 1 captures {var_ratio[0]}% variance; "
+        f"Component 2 captures {var_ratio[1]}% variance."
+    )
+    pca_fig = create_pca_cluster_chart(clustering_result["pca_df"], var_ratio)
+    st.plotly_chart(pca_fig, use_container_width=True)
+
+    st.divider()
+
+    # 5. Cluster Profiles & Segment Insights
+    st.markdown("#### 3. Segment Characteristics & Behavioral Profiles")
+    profile_df = generate_cluster_profiles(clustering_result["clustered_df"])
+
+    st.dataframe(profile_df, use_container_width=True)
+
+    # Profile Bar Chart
+    prof_fig = create_cluster_profile_bar_chart(profile_df)
+    st.plotly_chart(prof_fig, use_container_width=True)
+
+    # Detailed Segment Cards
+    st.markdown("##### 📌 Segment Behavioral Breakdown:")
+    card_cols = st.columns(k_val)
+    for idx, row in profile_df.iterrows():
+        c_num = int(row["Cluster"])
+        with card_cols[c_num]:
+            st.markdown(
+                f"""
+                <div style="background-color: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px; border-left: 4px solid #3182ce;">
+                    <h4 style="margin:0;">Cluster {c_num}</h4>
+                    <p style="color:#d69e2e; font-weight:bold; margin-bottom:8px;">{row['DescriptivePersona']}</p>
+                    <p style="margin:2px 0;"><b>Size:</b> {row['CustomerCount']} ({row['CustomerPct']}%)</p>
+                    <p style="margin:2px 0;"><b>Avg Spend:</b> ${row['MeanSales']:,.2f}</p>
+                    <p style="margin:2px 0;"><b>Avg Profit:</b> ${row['MeanProfit']:,.2f}</p>
+                    <p style="margin:2px 0;"><b>Margin:</b> {row['ProfitMarginPct']:.1f}%</p>
+                    <p style="margin:2px 0;"><b>Avg Recency:</b> {row['MeanRecencyDays']:.0f} days</p>
+                    <p style="margin:2px 0;"><b>Avg Discount:</b> {row['MeanDiscountPct']:.1f}%</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+
 def render_roadmap_tab() -> None:
-    """Render architecture overview and Day 3/Day 4 ML roadmap."""
+    """Render architecture overview and multi-day project delivery roadmap."""
     st.markdown("### 🚀 Project Architecture & Roadmap")
     st.markdown(
         """
@@ -304,8 +451,8 @@ def render_roadmap_tab() -> None:
         st.success("**Day 2 (Completed)**\n- Reusable EDA Module (`src/eda.py`)\n- Interactive Plotly Visualizations\n- Dynamic Filtering (Category/Region)\n- 31 Total Unit Tests Passed")
 
     with col2:
-        st.info("**Day 3 (Next Phase)**\n- Customer Segmentation (`src/segmentation.py`)\n- RFM / Behavioral Feature Scaling\n- K-Means Clustering\n- Elbow & Silhouette Evaluation")
-        st.info("**Day 4 (Supervised ML)**\n- Sales Forecasting Regression (`src/prediction.py`)\n- Feature Engineering & Train/Test Split\n- Linear Regression vs Random Forest\n- Metrics: $R^2$, RMSE, MAE")
+        st.success("**Day 3 (Completed)**\n- Customer Segmentation (`src/segmentation.py`)\n- RFM / Behavioral Feature Scaling\n- K-Means Clustering & PCA Projection\n- 48 Total Unit Tests Passed")
+        st.info("**Day 4 (Next Phase)**\n- Sales Forecasting Regression (`src/prediction.py`)\n- Feature Engineering & Train/Test Split\n- Linear Regression vs Random Forest\n- Metrics: $R^2$, RMSE, MAE")
 
     with col3:
         st.warning("**Day 5 (Integration & Polish)**\n- Automated Decision Support Engine (`src/insights.py`)\n- Full UI Integration & Error Hardening\n- Optional FastAPI REST Wrapper")
@@ -320,8 +467,9 @@ def render_roadmap_tab() -> None:
         ├── src/                  <-- Pure Domain Logic (UI-agnostic, DB-agnostic)
         │   ├── data_loader.py    <-- File & buffer ingestion
         │   ├── validator.py      <-- Schema and business constraint validation
-        │   └── eda.py            <-- Analytical KPIs, trends, and charts
-        ├── tests/                <-- Automated Pytest Suite (31 passed tests)
+        │   ├── eda.py            <-- Analytical KPIs, trends, and charts
+        │   └── segmentation.py   <-- K-Means clustering, PCA projection, & profiling
+        ├── tests/                <-- Automated Pytest Suite (48 passed tests)
         ├── docs/                 <-- System architecture & API documentation
         └── .env.example          <-- Externalized configuration for future stack
         """,
@@ -335,9 +483,10 @@ def main() -> None:
     df, source_name = render_sidebar()
 
     if df is not None:
-        tab_validate, tab_eda, tab_roadmap = st.tabs([
+        tab_validate, tab_eda, tab_segmentation, tab_roadmap = st.tabs([
             "📋 Data Ingestion & Validation",
             "📊 Exploratory Data Analysis (EDA)",
+            "🎯 Customer Segmentation (K-Means)",
             "🚀 System Architecture & Roadmap",
         ])
 
@@ -349,6 +498,12 @@ def main() -> None:
                 render_eda_tab(df)
             else:
                 st.error("Cannot perform Exploratory Data Analysis on an invalid dataset. Please resolve validation errors in the first tab.")
+
+        with tab_segmentation:
+            if is_valid:
+                render_segmentation_tab(df)
+            else:
+                st.error("Cannot perform Customer Segmentation on an invalid dataset. Please resolve validation errors in the first tab.")
 
         with tab_roadmap:
             render_roadmap_tab()
