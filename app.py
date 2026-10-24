@@ -1,7 +1,7 @@
 """
 BizInsightIQ — AI-Powered Business Intelligence, Predictive Analytics & Decision Support System
 MCA Final-Semester Project - Streamlit Application Dashboard
-Day 4: Supervised Machine Learning (Sales Prediction, Regression Evaluation & What-If Simulation)
+Day 5: Decision Support & Actionable Business Insights Engine
 """
 
 from pathlib import Path
@@ -41,6 +41,13 @@ from src.prediction import (
     create_model_comparison_bar_chart,
     CATEGORICAL_FEATURES,
     NUMERIC_FEATURES,
+)
+from src.insights import (
+    BusinessInsight,
+    generate_all_insights,
+    filter_insights,
+    get_insights_summary,
+    create_insights_distribution_chart,
 )
 
 
@@ -123,7 +130,7 @@ def render_sidebar() -> tuple[pd.DataFrame | None, str]:
         st.sidebar.markdown(f"- `{col}`")
 
     st.sidebar.markdown("---")
-    st.sidebar.caption("**Status:** Day 4 Completed (Sales Prediction ML & Evaluation)")
+    st.sidebar.caption("**Status:** Day 5 Completed (Decision Support & Actionable Insights Engine)")
 
     return df, source_name
 
@@ -675,6 +682,142 @@ def render_prediction_tab(df: pd.DataFrame) -> None:
     )
 
 
+def render_insights_tab(df: pd.DataFrame) -> None:
+    """
+    Render decision support engine with prioritized, evidence-based business insights.
+    """
+    st.markdown("### 💡 Business Insights & Actionable Decision Support")
+    st.caption(
+        "Automated rule-based heuristic decision engine synthesizing descriptive KPIs, "
+        "category margins, discount brackets, customer clusters, and predictive regression models "
+        "into prioritized, evidence-based recommendations."
+    )
+
+    try:
+        with st.spinner("Synthesizing multi-pillar business insights..."):
+            insights = generate_all_insights(df)
+    except Exception as e:
+        st.error(f"Error generating business insights: {e}")
+        return
+
+    if not insights:
+        st.info("No actionable rule-based insights were identified for the current dataset parameters.")
+        return
+
+    summary = get_insights_summary(insights)
+
+    # 1. Executive Metric Summary Cards
+    col_tot, col_crit, col_warn, col_info = st.columns(4)
+    with col_tot:
+        st.metric(label="Total Insights Generated", value=summary["total"])
+    with col_crit:
+        st.metric(label="Critical Priority", value=summary["by_severity"]["critical"])
+    with col_warn:
+        st.metric(label="Warning / Action Needed", value=summary["by_severity"]["warning"])
+    with col_info:
+        st.metric(label="Informational / Best Practice", value=summary["by_severity"]["info"])
+
+    st.divider()
+
+    # 2. Interactive Filtering Controls
+    st.markdown("#### 1. Filter Strategic Recommendations")
+    f_col1, f_col2 = st.columns([1, 1])
+
+    with f_col1:
+        cat_options = ["All"] + list(summary["by_category"].keys())
+        selected_cat = st.selectbox("Filter by Analytical Pillar:", options=cat_options, index=0)
+
+    with f_col2:
+        sev_options = ["All", "Critical", "Warning", "Info"]
+        selected_sev_label = st.selectbox("Filter by Severity Level:", options=sev_options, index=0)
+        selected_sev = selected_sev_label.lower() if selected_sev_label != "All" else "All"
+
+    filtered_insights = filter_insights(insights, category=selected_cat, severity=selected_sev)
+
+    # 3. Visual Breakdown Chart
+    with st.expander("📊 View Insights Distribution Chart", expanded=False):
+        chart_fig = create_insights_distribution_chart(insights)
+        st.plotly_chart(chart_fig, use_container_width=True)
+
+    st.markdown(f"**Showing {len(filtered_insights)} of {len(insights)} Recommendations:**")
+
+    # 4. Render Prioritized Recommendation Cards
+    severity_styles = {
+        "critical": {
+            "border": "#e53e3e",
+            "bg": "rgba(229, 62, 62, 0.08)",
+            "badge": "🔴 CRITICAL",
+            "color": "#e53e3e",
+        },
+        "warning": {
+            "border": "#dd6b20",
+            "bg": "rgba(221, 107, 32, 0.08)",
+            "badge": "🟠 WARNING",
+            "color": "#dd6b20",
+        },
+        "info": {
+            "border": "#3182ce",
+            "bg": "rgba(49, 130, 206, 0.08)",
+            "badge": "🔵 INFORMATIONAL",
+            "color": "#3182ce",
+        },
+    }
+
+    for ins in filtered_insights:
+        style = severity_styles.get(ins.severity, severity_styles["info"])
+
+        # Format evidence key-values
+        evidence_lines = []
+        for k, v in ins.evidence.items():
+            k_formatted = k.replace("_", " ").title()
+            if isinstance(v, float):
+                v_formatted = f"{v:,.2f}"
+            elif isinstance(v, int):
+                v_formatted = f"{v:,}"
+            elif isinstance(v, list):
+                v_formatted = ", ".join(str(item) for item in v)
+            else:
+                v_formatted = str(v)
+            evidence_lines.append(f"• **{k_formatted}:** {v_formatted}")
+        evidence_text = "<br>".join(evidence_lines)
+
+        st.markdown(
+            f"""
+            <div style="background-color: {style['bg']}; border-left: 5px solid {style['border']}; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-weight: bold; font-size: 1.1em; color: {style['color']};">
+                        {style['badge']} | {ins.title}
+                    </span>
+                    <span style="font-size: 0.85em; opacity: 0.8; font-family: monospace;">
+                        [{ins.insight_id}] • {ins.category}
+                    </span>
+                </div>
+                <div style="margin-bottom: 10px; font-size: 0.95em; line-height: 1.4;">
+                    <b>📊 Empirical Evidence:</b><br>
+                    {evidence_text}
+                </div>
+                <div style="margin-bottom: 8px; font-size: 0.95em;">
+                    <b>🎯 Strategic Recommendation:</b> {ins.recommendation}
+                </div>
+                <div style="font-size: 0.85em; opacity: 0.75; font-style: italic;">
+                    <b>⚠️ Limitations:</b> {ins.limitations}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.divider()
+
+    # 5. Synthetic Data & Operational Caveat Notice
+    st.info(
+        "🛡️ **Academic & Operational Methodology Notice:**  \n"
+        "All recommendations are generated by deterministic heuristic decision rules evaluated on the bundled synthetic retail dataset. "
+        "Observed correlations (such as margin compression in high-discount brackets) do not establish causal necessity. "
+        "Business stakeholders should conduct controlled A/B pricing experiments and consult cost accountants before enacting policy adjustments."
+    )
+
+
 def render_roadmap_tab() -> None:
     """Render architecture overview and multi-day project delivery roadmap."""
     st.markdown("### 🚀 Project Architecture & Roadmap")
@@ -697,8 +840,8 @@ def render_roadmap_tab() -> None:
         st.success("**Day 4 (Completed)**\n- Sales Forecasting Regression (`src/prediction.py`)\n- Feature Engineering & Chronological Split\n- Linear Regression vs Random Forest\n- Metrics: $R^2$, RMSE, MAE (70 Tests Passed)")
 
     with col3:
-        st.info("**Day 5 (Next Phase)**\n- Automated Decision Support Engine (`src/insights.py`)\n- Full UI Integration & Error Hardening\n- Optional FastAPI REST Wrapper")
-        st.warning("**Day 6 (Academic Deliverables)**\n- Empirical Report Evidence\n- High-Res Architecture Diagrams\n- Metric Tables for Project Report\n- Viva Presentation Preparation")
+        st.success("**Day 5 (Completed)**\n- Decision Support Engine (`src/insights.py`)\n- Explainable Multi-Pillar Rules & Evidence\n- Interactive Streamlit Dashboard Tab\n- 91 Total Unit Tests Passed")
+        st.info("**Day 6 (Academic Deliverables - Next Phase)**\n- Final End-to-End System Verification\n- High-Res Architecture Diagrams\n- Performance Tables for Project Report\n- Viva Presentation Preparation")
 
     st.divider()
     st.markdown("#### Architectural Decoupling Rules")
@@ -711,8 +854,9 @@ def render_roadmap_tab() -> None:
         │   ├── validator.py      <-- Schema and business constraint validation
         │   ├── eda.py            <-- Analytical KPIs, trends, and charts
         │   ├── segmentation.py   <-- K-Means clustering, PCA projection, & profiling
-        │   └── prediction.py     <-- Supervised regression, evaluation & what-if
-        ├── tests/                <-- Automated Pytest Suite (70 passed tests)
+        │   ├── prediction.py     <-- Supervised regression, evaluation & what-if
+        │   └── insights.py       <-- Decision support & actionable recommendations
+        ├── tests/                <-- Automated Pytest Suite (91 passed tests)
         ├── docs/                 <-- System architecture & API documentation
         └── .env.example          <-- Externalized configuration for future stack
         """,
@@ -726,11 +870,12 @@ def main() -> None:
     df, source_name = render_sidebar()
 
     if df is not None:
-        tab_validate, tab_eda, tab_segmentation, tab_prediction, tab_roadmap = st.tabs([
+        tab_validate, tab_eda, tab_segmentation, tab_prediction, tab_insights, tab_roadmap = st.tabs([
             "📋 Data Ingestion & Validation",
             "📊 Exploratory Data Analysis (EDA)",
             "🎯 Customer Segmentation (K-Means)",
             "🔮 Sales Prediction (Regression)",
+            "💡 Business Insights & Recommendations",
             "🚀 System Architecture & Roadmap",
         ])
 
@@ -754,6 +899,12 @@ def main() -> None:
                 render_prediction_tab(df)
             else:
                 st.error("Cannot perform Sales Prediction on an invalid dataset. Please resolve validation errors in the first tab.")
+
+        with tab_insights:
+            if is_valid:
+                render_insights_tab(df)
+            else:
+                st.error("Cannot generate Business Insights on an invalid dataset. Please resolve validation errors in the first tab.")
 
         with tab_roadmap:
             render_roadmap_tab()

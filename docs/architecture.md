@@ -60,7 +60,7 @@ To satisfy both academic rigor and enterprise-grade software standards, BizInsig
   * `src/eda.py`: Aggregation algorithms for KPIs, chronological trends, category/regional metrics, and discount-profit correlations.
   * `src/segmentation.py` *(Day 3)*: Unsupervised clustering service encapsulating feature scaling, elbow curve, silhouette analysis, and customer persona profiling.
   * `src/prediction.py` *(Day 4)*: Supervised regression service encapsulating feature engineering, train/test split, model training (Linear Regression, Random Forest), and what-if simulation.
-  * `src/evaluation.py` *(Day 4/5)*: Standardized regression and clustering evaluation metrics ($R^2$, RMSE, MAE, Silhouette).
+  * `src/insights.py` *(Day 5)*: Decision support engine synthesizing multi-pillar evidence into structured, prioritized, explainable business recommendations.
 
 ### 2.2 Presentation Layer
 * **Primary (Streamlit):** Direct offline workstation for academic viva defense. Calls `src/` modules natively. Guarantees 100% offline demonstration reliability.
@@ -157,3 +157,44 @@ Ensemble of $B = 100$ bootstrap regression trees with `max_depth = 10` and `rand
 | **Coefficient of Determination ($R^2$)** | **0.6269** | **0.6306** | **+0.0037 (Higher is better)** |
 
 **Academic Finding:** The Random Forest model demonstrates superior predictive precision, reducing median and average dollar deviations by over \$198 per transaction quote while accounting for non-linear discount-tier pricing effects.
+
+---
+
+## 6. Decision Support & Actionable Business Insights Engine (`src/insights.py`)
+
+### 6.1 Architectural Role & Design Principles
+The decision support engine bridges statistical/machine learning outputs and managerial decision-making. Operating as a pure, framework-independent domain service, it synthesizes empirical evidence across all upstream modules:
+1. **Zero External Inference Dependency:** Does not rely on non-deterministic LLMs or black-box third-party cloud APIs.
+2. **Deterministic & Reversible:** Evaluates mathematically explicit condition thresholds on validated analytical DataFrames.
+3. **Causal Modesty:** Explicitly frames findings as observed statistical associations and correlations rather than unproven causal mechanisms.
+
+### 6.2 Structured Recommendation Contract
+Every generated recommendation adheres to the `BusinessInsight` data contract:
+* `insight_id`: Unique identifier (e.g. `INS-SALES-001`, `INS-DISC-001`, `INS-SEG-C0-RECENCY`).
+* `category`: Analytical pillar (`Sales & Profitability`, `Discount Effectiveness`, `Customer Segmentation`, `Predictive Decision Support`).
+* `severity`: Priority classification (`critical`, `warning`, `info`).
+* `title`: Concise managerial executive summary.
+* `evidence`: Dictionary of quantified supporting metrics and benchmark comparisons.
+* `recommendation`: Cautious, actionable business advisory text.
+* `limitations`: Explicit statement of analytical assumptions and synthetic boundary conditions.
+
+### 6.3 Rule Hierarchy Across Analytical Pillars
+
+#### Pillar A: Sales & Profitability
+* **Revenue Concentration Rule:** Identifies when a single category accounts for $\ge 50\%$ of enterprise turnover (`top_category_sales / total_sales >= 0.50`). Advises portfolio diversification.
+* **Regional Margin Disparity Rule:** Identifies territories where regional profit margin falls below the corporate benchmark by $\ge 1.5$ percentage points ($\text{Margin}_{\text{region}} < \text{Margin}_{\text{overall}} - 1.5\%$). Recommends regional cost/fulfillment auditing.
+* **Regional Volume Underperformance Rule:** Identifies regions generating sales $> 15\%$ below the multi-region mean.
+* **Unprofitable Periods Rule:** Detects negative aggregate profit in any chronological monthly period.
+
+#### Pillar B: Discount Effectiveness
+* **Deep Discount Margin Collapse Rule:** Compares orders with discount $> 20\%$ against baseline non-discounted orders ($0\%$). Triggers when profit margin collapses by $> 15$ percentage points or drops below $5\%$. Recommends mandatory approval guardrails.
+* **Moderate Discount Elasticity Rule:** Detects sharp step-downs between $1\text{--}10\%$ and $11\text{--}20\%$ promotional tiers.
+
+#### Pillar C: Customer Segmentation
+* **Customer Dormancy / Churn Risk:** Triggers when a cluster's mean recency is $\ge 120$ days and $\ge 1.5\times$ population median recency.
+* **Promotional Discount Dependence:** Flags clusters with mean discount rates $\ge 20\%$ and $\ge 1.5\times$ population average discount.
+* **High-Value VIP Retention:** Highlights top-tier customer clusters generating $\ge 90\%$ of peak cluster spend with healthy margins ($\ge 18\%$).
+
+#### Pillar D: Predictive Decision Support
+* **Model Champion Selection:** Recommends Random Forest or Linear Regression based on held-out out-of-sample MAE error minimization, noting unexplained variance ($1 - R^2$).
+* **Decision Scope Boundary:** Advises that transaction-level quote models must not be conflated with macroeconomic aggregate demand forecasts.

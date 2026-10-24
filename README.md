@@ -1,7 +1,7 @@
 # AI-Powered Business Intelligence, Predictive Analytics and Decision Support System
 
 **Academic Degree:** Master of Computer Applications (MCA)  
-**Project Phase:** Day 4 Implementation (Supervised ML: Sales Prediction, Regression Evaluation & What-If Simulation)
+**Project Phase:** Day 5 Implementation (Decision Support & Actionable Business Insights Engine)
 
 ---
 
@@ -11,11 +11,11 @@ This project is an AI/ML-driven business intelligence and decision support syste
 
 The core analytical pipeline encompasses:
 1. **Data Ingestion & Integrity Validation:** Safe CSV loading, schema verification, missing data detection, and business constraint validation.
-2. **Exploratory Data Analysis (EDA):** Interactive Plotly visualizations for sales trends, category performance, and geographic distribution *(Planned Day 2)*.
-3. **Customer Segmentation:** Unsupervised machine learning using K-Means clustering to uncover customer behavioral segments *(Planned Day 3)*.
-4. **Predictive Analytics:** Supervised machine learning using regression models to forecast future sales volume and revenue *(Planned Day 4)*.
-5. **Decision Support & Actionable Insights:** Automated heuristic insight generation and recommendations *(Planned Day 5)*.
-6. **Interactive Dashboard:** An accessible, self-contained Streamlit web interface.
+2. **Exploratory Data Analysis (EDA):** Interactive Plotly visualizations for sales trends, category performance, and geographic distribution.
+3. **Customer Segmentation:** Unsupervised machine learning using K-Means clustering to uncover customer behavioral segments.
+4. **Predictive Analytics:** Supervised machine learning using regression models to forecast future sales volume and revenue.
+5. **Decision Support & Actionable Insights:** Automated heuristic insight generation and recommendations (`src/insights.py`).
+6. **Interactive Dashboard:** An accessible, self-contained Streamlit web interface with 6 analytical modules.
 
 ---
 
@@ -84,13 +84,13 @@ pip install -r requirements.txt
 ## 5. Running the Application and Tests
 
 ### 5.1 Run Automated Unit Tests
-To verify data validation rules, error handling, EDA aggregations, segmentation clustering, and regression predictions:
+To verify data validation rules, error handling, EDA aggregations, segmentation clustering, regression predictions, and heuristic business recommendations:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -v
 ```
 
-All 70 automated test cases across four test suites pass cleanly.
+All 91 automated test cases across five test suites pass cleanly.
 
 ### 5.2 Launch the Interactive Dashboard
 To start the Streamlit web dashboard:
@@ -114,7 +114,7 @@ MCA_AI_ML_Project_and_Report/
     ├── requirements.txt         # Pinned production dependencies
     ├── pytest.ini               # Pytest configuration and pythonpath definition
     ├── README.md                # Project documentation and setup guide
-    ├── app.py                   # Main Streamlit web application (5 Interactive Tabs)
+    ├── app.py                   # Main Streamlit web application (6 Interactive Tabs)
     ├── data/
     │   └── sample_sales_data.csv# Bundled synthetic sales dataset (1,200 rows)
     ├── docs/
@@ -125,12 +125,14 @@ MCA_AI_ML_Project_and_Report/
     │   ├── validator.py         # Schema and business rule validation engine
     │   ├── eda.py               # Framework-agnostic EDA computations & charts
     │   ├── segmentation.py      # K-Means clustering, PCA projection, & profiling
-    │   └── prediction.py        # Supervised regression, evaluation & what-if simulator
+    │   ├── prediction.py        # Supervised regression, evaluation & what-if simulator
+    │   └── insights.py          # Decision support & actionable business insights
     └── tests/
         ├── test_validation.py   # Pytest automated test suite (15 test cases)
         ├── test_eda.py          # Pytest EDA analytical test suite (16 test cases)
         ├── test_ml_segmentation.py # Pytest customer segmentation test suite (17 test cases)
-        └── test_ml_prediction.py   # Pytest sales prediction test suite (22 test cases)
+        ├── test_ml_prediction.py   # Pytest sales prediction test suite (22 test cases)
+        └── test_insights.py        # Pytest decision support insights test suite (21 test cases)
 ```
 
 ---
@@ -141,5 +143,5 @@ MCA_AI_ML_Project_and_Report/
 - [x] **Day 2 (Completed):** Framework-agnostic EDA engine (`src/eda.py`), interactive Plotly visualizers (Sales Trends, Category Performance, Regional Distributions, Discount Impact, Correlation Heatmap), full UI integration in `app.py`, and 31 passed unit tests.
 - [x] **Day 3 (Completed):** Unsupervised Machine Learning — Customer Segmentation Engine (`src/segmentation.py`) using Scikit-learn K-Means, RFM feature aggregation, StandardScaler, Elbow/Silhouette diagnostics, 2D PCA visual projection, persona profiling, dashboard integration, and 48 passed unit tests.
 - [x] **Day 4 (Completed):** Supervised Machine Learning — Sales Prediction Regression models (`src/prediction.py`) comparing Linear Regression baseline vs Random Forest Regressor, chronological 80/20 train/test split, target leakage prevention, what-if scenario simulator, regression diagnostics ($R^2$, RMSE, MAE), dashboard integration, and 70 passed unit tests.
-- [ ] **Day 5 (Next):** Decision Support Engine — Automated business insight generation and recommendations (`src/insights.py`), error hardening, and full UI integration.
-- [ ] **Day 6:** Final End-to-End System Verification, Performance Tables, and MCA Project Report Evidence compilation.
+- [x] **Day 5 (Completed):** Decision Support & Actionable Insights Engine (`src/insights.py`) — Explainable rule-based recommendations across Sales, Discounts, Segmentation, and Predictions, severity categorization, interactive UI cards, and 91 passed unit tests.
+- [ ] **Day 6 (Next):** Final End-to-End System Verification, Performance Tables, Viva Presentation Preparation, and MCA Project Report Evidence compilation.
