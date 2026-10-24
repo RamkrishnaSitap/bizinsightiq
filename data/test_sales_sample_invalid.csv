@@ -1,0 +1,5 @@
+CustomerID,OrderDate,Category,Region,Quantity,Discount,Sales,Profit
+CUST-1085,2023-01-01,Furniture,South,-5,0.20,2078.39,248.48
+CUST-1020,2023-01-01,Technology,East,9,1.50,4597.17,121.94
+CUST-1065,INVALID_DATE,Technology,North,6,0.30,-861.94,79.50
+CUST-1121,2023-01-04,,North,2,0.05,1088.45,115.06
