@@ -20,16 +20,16 @@
 
 **Submitted by:**
 
-**[Student Name]**  
-Registration No.: **[Registration Number]**  
-Roll No.: **[Roll Number]**  
+**Ramkrishna Sitap**  
+Registration No.: ____________________  
+Roll No.: ____________________  
 
 <br/>
 
 **Under the Guidance of:**
 
-**[Supervisor Name]**  
-[Designation of Supervisor]  
+____________________  
+____________________  
 Centre for Distance and Online Education (CDOE)  
 
 <br/>
@@ -49,7 +49,7 @@ Centre for Distance and Online Education (CDOE)
 
 ### ANNEXURE – II: CANDIDATE'S DECLARATION
 
-I hereby declare that the capstone project work entitled **"BizInsightIQ: An AI-Powered Business Intelligence, Customer Segmentation, and Predictive Analytics System"**, submitted in partial fulfillment of the requirements for the award of the degree of **Master of Computer Applications (MCA)** to the Centre for Distance and Online Education (CDOE), Lovely Professional University, Phagwara, Punjab, is an authentic record of my original work carried out under the supervision and guidance of **[Supervisor Name]**, [Designation], Centre for Distance and Online Education, Lovely Professional University.
+I hereby declare that the capstone project work entitled **"BizInsightIQ: An AI-Powered Business Intelligence, Customer Segmentation, and Predictive Analytics System"**, submitted in partial fulfillment of the requirements for the award of the degree of **Master of Computer Applications (MCA)** to the Centre for Distance and Online Education (CDOE), Lovely Professional University, Phagwara, Punjab, is an authentic record of my original work carried out under the supervision and guidance of ____________________, ____________________, Centre for Distance and Online Education, Lovely Professional University.
 
 The matter embodied in this project report has not been submitted in part or full to any other University or Institute for the award of any degree, diploma, or fellowship.
 
@@ -64,9 +64,9 @@ I further declare that the source code, empirical benchmarking, diagnostic evalu
 <br/>
 
 _______________________________  
-**[Student Name]**  
-Registration Number: **[Registration Number]**  
-Roll Number: **[Roll Number]**  
+**Ramkrishna Sitap**  
+Registration Number: ____________________  
+Roll Number: ____________________  
 Master of Computer Applications (MCA)  
 Centre for Distance and Online Education  
 Lovely Professional University  
@@ -75,7 +75,7 @@ Lovely Professional University
 
 ### CERTIFICATE OF THE SUPERVISOR
 
-This is to certify that the capstone project work entitled **"BizInsightIQ: An AI-Powered Business Intelligence, Customer Segmentation, and Predictive Analytics System"**, submitted by **[Student Name]** (Registration No.: **[Registration Number]**, Roll No.: **[Roll Number]**), in partial fulfillment of the requirements for the award of the degree of **Master of Computer Applications (MCA)** from Lovely Professional University, Phagwara, Punjab, is a bonafide record of work carried out by the student under my supervision and guidance.
+This is to certify that the capstone project work entitled **"BizInsightIQ: An AI-Powered Business Intelligence, Customer Segmentation, and Predictive Analytics System"**, submitted by **Ramkrishna Sitap** (Registration No.: ____________________, Roll No.: ____________________), in partial fulfillment of the requirements for the award of the degree of **Master of Computer Applications (MCA)** from Lovely Professional University, Phagwara, Punjab, is a bonafide record of work carried out by the student under my supervision and guidance.
 
 To the best of my knowledge, the matter presented in this report has not been submitted for the award of any other degree, diploma, or certificate in this or any other university or institution.
 
@@ -90,8 +90,8 @@ The project demonstrates technical competence, sound architectural separation of
 <br/>
 
 _______________________________  
-**[Supervisor Name]**  
-[Designation of Supervisor]  
+____________________  
+____________________  
 Centre for Distance and Online Education  
 Lovely Professional University  
 Phagwara, Punjab, India  
@@ -102,7 +102,7 @@ Phagwara, Punjab, India
 
 The successful culmination of this capstone project would not have been possible without the guidance, encouragement, and intellectual support of many individuals to whom I owe a profound debt of gratitude.
 
-First and foremost, I express my deepest gratitude to my esteemed project supervisor, **[Supervisor Name]**, [Designation], Centre for Distance and Online Education (CDOE), Lovely Professional University, for their invaluable mentorship, insightful critique, and continuous encouragement throughout the lifecycle of this project. Their academic rigor and technical perspectives have shaped both the design of the BizInsightIQ system and the empirical depth of this report.
+First and foremost, I express my deepest gratitude to my esteemed project supervisor, ____________________, ____________________, Centre for Distance and Online Education (CDOE), Lovely Professional University, for their invaluable mentorship, insightful critique, and continuous encouragement throughout the lifecycle of this project. Their academic rigor and technical perspectives have shaped both the design of the BizInsightIQ system and the empirical depth of this report.
 
 I extend my heartfelt thanks to the **Academic Leadership and Faculty Members** of the Centre for Distance and Online Education, Lovely Professional University, for providing an academically stimulating environment, well-structured curriculum, and digital resources that laid a solid foundation for my Master of Computer Applications studies.
 
@@ -113,8 +113,8 @@ Finally, I acknowledge the open-source software community behind Python, Streaml
 <br/>
 <br/>
 
-**[Student Name]**  
-Registration No.: **[Registration Number]**  
+**Ramkrishna Sitap**  
+Registration No.: ____________________  
 MCA Final Semester  
 
 ---
@@ -1106,7 +1106,7 @@ The empirical findings and architectural principles developed in the BizInsightI
 
 - **Manuscript Title:** *BizInsightIQ: An Augmented Business Intelligence Framework Integrating RFM+D Behavioral Segmentation and Out-of-Time Revenue Forecasting*
 - **Target Venue:** IEEE International Conference on Advances in Computing, Communication and Applied Informatics (ACCAI) / Scopus-Indexed Computing Journal.
-- **Authors:** [Student Name], [Supervisor Name].
+- **Authors:** Ramkrishna Sitap, ____________________.
 - **Affiliation:** Centre for Distance and Online Education, Lovely Professional University, Phagwara, Punjab, India.
 - **Status:** Manuscript under preparation; incorporates empirical results, margin compression findings, and comparative regression benchmarks documented in this report.
 
