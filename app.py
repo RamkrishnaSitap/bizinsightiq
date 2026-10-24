@@ -5,6 +5,7 @@ Day 5: Decision Support & Actionable Business Insights Engine
 """
 
 from pathlib import Path
+from typing import Any
 import streamlit as st
 import pandas as pd
 
@@ -54,30 +55,118 @@ from src.insights import (
 DEFAULT_SAMPLE_PATH = Path("data/sample_sales_data.csv")
 
 
-def format_currency(val: float, mode: str | None = None, convert: bool | None = None, rate: float = 83.0) -> str:
+def _format_inr_number(val: float, indian_grouping: bool = False) -> str:
+    """Format numeric value into Indian Rupee string with proper sign and grouping."""
+    is_neg = val < 0
+    abs_val = abs(val)
+    if not indian_grouping:
+        num_str = f"{abs_val:,.2f}"
+    else:
+        s = f"{abs_val:.2f}"
+        int_part, dec_part = s.split(".")
+        if len(int_part) <= 3:
+            num_str = f"{int_part}.{dec_part}"
+        else:
+            last3 = int_part[-3:]
+            rest = int_part[:-3]
+            chunks = []
+            while len(rest) > 2:
+                chunks.insert(0, rest[-2:])
+                rest = rest[:-2]
+            if rest:
+                chunks.insert(0, rest)
+            num_str = f"{','.join(chunks)},{last3}.{dec_part}"
+    return f"-₹{num_str}" if is_neg else f"₹{num_str}"
+
+
+def get_currency_config() -> dict[str, Any]:
+    """Retrieve active currency settings from Streamlit session state."""
+    mode = st.session_state.get("currency_mode", "Rupees (₹)")
+    rate = float(st.session_state.get("exchange_rate", 83.0))
+    source_curr = st.session_state.get("data_currency", "US Dollars ($)")
+    indian_grouping = st.session_state.get("use_indian_grouping", False)
+
+    is_source_inr = "Rupees" in source_curr or "INR" in source_curr or "₹" in source_curr
+
+    if is_source_inr:
+        inr_multiplier = 1.0
+        usd_multiplier = 1.0 / rate if rate > 0 else 1.0
+    else:
+        inr_multiplier = rate
+        usd_multiplier = 1.0
+
+    if mode == "Rupees (₹)":
+        primary_symbol = "₹"
+        scale = inr_multiplier
+    elif mode == "US Dollars ($)":
+        primary_symbol = "$"
+        scale = usd_multiplier
+    else:  # "Both (₹ & $)"
+        primary_symbol = "₹"
+        scale = inr_multiplier
+
+    return {
+        "mode": mode,
+        "rate": rate,
+        "source_currency": source_curr,
+        "is_source_inr": is_source_inr,
+        "inr_multiplier": inr_multiplier,
+        "usd_multiplier": usd_multiplier,
+        "scale": scale,
+        "primary_symbol": primary_symbol,
+        "indian_grouping": indian_grouping,
+    }
+
+
+def format_currency(
+    val: float,
+    mode: str | None = None,
+    rate: float | None = None,
+    source_currency: str | None = None,
+    indian_grouping: bool | None = None,
+) -> str:
     """
-    Format monetary amounts according to user-selected currency configuration.
+    Format monetary amounts dynamically according to user-selected currency configuration.
 
     Modes:
-    - 'Rupees (₹)' (Default)
-    - 'Both (₹ & $)'
-    - 'US Dollars ($)'
+    - 'Rupees (₹)' (Default): Converts amounts to Indian Rupees using active exchange rate.
+    - 'Both (₹ & $)': Displays primary amount in Rupees with USD in parentheses.
+    - 'US Dollars ($)': Displays amount in US Dollars.
     """
     if pd.isna(val):
         return "-"
+
+    try:
+        val_float = float(val)
+    except (ValueError, TypeError):
+        return str(val)
+
     if mode is None:
         mode = st.session_state.get("currency_mode", "Rupees (₹)")
-    if convert is None:
-        convert = st.session_state.get("convert_currency", False)
+    if rate is None:
+        rate = float(st.session_state.get("exchange_rate", 83.0))
+    if source_currency is None:
+        source_currency = st.session_state.get("data_currency", "US Dollars ($)")
+    if indian_grouping is None:
+        indian_grouping = st.session_state.get("use_indian_grouping", False)
+
+    is_source_inr = "Rupees" in source_currency or "INR" in source_currency or "₹" in source_currency
+    if is_source_inr:
+        inr_val = val_float
+        usd_val = val_float / rate if rate > 0 else val_float
+    else:
+        usd_val = val_float
+        inr_val = val_float * rate
+
+    inr_str = _format_inr_number(inr_val, indian_grouping=indian_grouping)
+    usd_str = f"-${abs(usd_val):,.2f}" if usd_val < 0 else f"${usd_val:,.2f}"
 
     if mode == "Rupees (₹)":
-        amt = val * rate if convert else val
-        return f"₹{amt:,.2f}"
+        return inr_str
     elif mode == "US Dollars ($)":
-        return f"${val:,.2f}"
+        return usd_str
     else:  # "Both (₹ & $)"
-        inr_amt = val * rate if convert else val
-        return f"₹{inr_amt:,.2f} (${val:,.2f})"
+        return f"{inr_str} ({usd_str})"
 
 
 def set_page_layout() -> None:
@@ -161,15 +250,43 @@ def render_sidebar() -> tuple[pd.DataFrame | None, str]:
         "Display Currency:",
         options=["Rupees (₹)", "Both (₹ & $)", "US Dollars ($)"],
         index=0,
-        help="Configure whether monetary values are displayed in Indian Rupees (₹) [Default], US Dollars ($), or Both."
+        help="Select display currency. Converted values are computed dynamically from dataset amounts."
     )
-    convert_currency = st.sidebar.checkbox(
-        "Apply USD → INR Conversion (1 USD = ₹83.00)",
-        value=False,
-        help="When enabled, converts USD values to INR at 1 USD = ₹83.00. When disabled, amounts are formatted directly with the chosen symbol."
-    )
+
+    with st.sidebar.expander("⚙️ Currency & Conversion Settings", expanded=True):
+        exchange_rate = st.number_input(
+            "USD to INR Rate (₹ / $):",
+            min_value=1.0,
+            max_value=250.0,
+            value=83.0,
+            step=0.5,
+            format="%.2f",
+            help="Exchange rate used to convert US Dollar amounts into Indian Rupees (default: 1 USD = ₹83.00)."
+        )
+        source_curr = st.selectbox(
+            "Raw Dataset Currency:",
+            options=["US Dollars ($)", "Indian Rupees (₹)"],
+            index=0,
+            help="Currency of the raw input dataset. Bundled sample sales data is priced in US Dollars ($)."
+        )
+        use_indian_grouping = st.checkbox(
+            "Indian Number Format (Lakhs/Crores)",
+            value=False,
+            help="Format amounts with Indian numbering grouping (e.g. ₹12,63,98,304.62 instead of ₹126,398,304.62)."
+        )
+
     st.session_state["currency_mode"] = currency_mode
-    st.session_state["convert_currency"] = convert_currency
+    st.session_state["exchange_rate"] = exchange_rate
+    st.session_state["data_currency"] = source_curr
+    st.session_state["use_indian_grouping"] = use_indian_grouping
+
+    # Visual confirmation indicator
+    if currency_mode == "Rupees (₹)":
+        st.sidebar.success(f"Active: **Indian Rupees (₹)**  \n*(Converted at ₹{exchange_rate:.2f} / $1 USD)*")
+    elif currency_mode == "Both (₹ & $)":
+        st.sidebar.info(f"Active: **Both (₹ & $)**  \n*(₹ amounts converted at ₹{exchange_rate:.2f} / $)*")
+    else:
+        st.sidebar.warning("Active: **US Dollars ($)**  \n*(Native unconverted USD values)*")
 
     st.sidebar.markdown("---")
     st.sidebar.caption("**Status:** Day 6 Completed (MCA Academic Deliverables & System Verification)")
@@ -301,9 +418,23 @@ def render_eda_tab(df: pd.DataFrame) -> None:
     st.divider()
 
     # 3. Monthly Sales & Profit Trends Chart
+    curr_cfg = get_currency_config()
+    chart_scale = curr_cfg["scale"]
+    chart_sym = curr_cfg["primary_symbol"]
+
     st.markdown("#### 1. Revenue & Profitability Trends Over Time")
     trend_df = compute_sales_profit_trends(filtered_df, freq="ME")
-    trend_fig = create_trend_chart(trend_df)
+    trend_df_plot = trend_df.copy()
+    if chart_scale != 1.0:
+        trend_df_plot["Sales"] = trend_df_plot["Sales"] * chart_scale
+        trend_df_plot["Profit"] = trend_df_plot["Profit"] * chart_scale
+    trend_fig = create_trend_chart(trend_df_plot)
+    trend_fig.update_yaxes(title_text=f"Sales ({chart_sym})", secondary_y=False)
+    trend_fig.update_yaxes(title_text=f"Profit ({chart_sym})", secondary_y=True)
+    if len(trend_fig.data) > 0:
+        trend_fig.data[0].name = f"Monthly Sales ({chart_sym})"
+    if len(trend_fig.data) > 1:
+        trend_fig.data[1].name = f"Monthly Profit ({chart_sym})"
     st.plotly_chart(trend_fig, use_container_width=True)
 
     st.divider()
@@ -314,7 +445,16 @@ def render_eda_tab(df: pd.DataFrame) -> None:
     with col_cat:
         st.markdown("#### 2. Performance by Product Category")
         cat_df = compute_category_performance(filtered_df)
-        cat_fig = create_category_bar_chart(cat_df)
+        cat_df_plot = cat_df.copy()
+        if chart_scale != 1.0:
+            cat_df_plot["Sales"] = cat_df_plot["Sales"] * chart_scale
+            cat_df_plot["Profit"] = cat_df_plot["Profit"] * chart_scale
+        cat_fig = create_category_bar_chart(cat_df_plot)
+        cat_fig.update_layout(yaxis_title=f"Amount ({chart_sym})")
+        if len(cat_fig.data) > 0:
+            cat_fig.data[0].name = f"Total Sales ({chart_sym})"
+        if len(cat_fig.data) > 1:
+            cat_fig.data[1].name = f"Total Profit ({chart_sym})"
         st.plotly_chart(cat_fig, use_container_width=True)
         with st.expander("View Category Breakdown Table"):
             fmt_cat_df = cat_df.copy()
@@ -327,7 +467,11 @@ def render_eda_tab(df: pd.DataFrame) -> None:
     with col_reg:
         st.markdown("#### 3. Regional Sales Distribution")
         reg_df = compute_regional_performance(filtered_df)
-        reg_fig = create_region_pie_chart(reg_df)
+        reg_df_plot = reg_df.copy()
+        if chart_scale != 1.0:
+            reg_df_plot["Sales"] = reg_df_plot["Sales"] * chart_scale
+            reg_df_plot["Profit"] = reg_df_plot["Profit"] * chart_scale
+        reg_fig = create_region_pie_chart(reg_df_plot)
         st.plotly_chart(reg_fig, use_container_width=True)
         with st.expander("View Regional Breakdown Table"):
             fmt_reg_df = reg_df.copy()
@@ -344,7 +488,12 @@ def render_eda_tab(df: pd.DataFrame) -> None:
 
     with col_disc:
         st.markdown("#### 4. Discount Impact on Profitability")
-        scatter_fig = create_discount_profit_scatter(filtered_df)
+        scatter_plot_df = filtered_df.copy()
+        if chart_scale != 1.0:
+            scatter_plot_df["Profit"] = scatter_plot_df["Profit"] * chart_scale
+            scatter_plot_df["Sales"] = scatter_plot_df["Sales"] * chart_scale
+        scatter_fig = create_discount_profit_scatter(scatter_plot_df)
+        scatter_fig.update_layout(yaxis_title=f"Net Profit ({chart_sym})")
         st.plotly_chart(scatter_fig, use_container_width=True)
 
         st.caption("Discount Tier Aggregate Performance:")
@@ -488,7 +637,20 @@ def render_segmentation_tab(df: pd.DataFrame) -> None:
     st.dataframe(fmt_profile, use_container_width=True)
 
     # Profile Bar Chart
-    prof_fig = create_cluster_profile_bar_chart(profile_df)
+    curr_cfg = get_currency_config()
+    chart_scale = curr_cfg["scale"]
+    chart_sym = curr_cfg["primary_symbol"]
+
+    profile_df_plot = profile_df.copy()
+    if chart_scale != 1.0:
+        profile_df_plot["MeanSales"] = profile_df_plot["MeanSales"] * chart_scale
+        profile_df_plot["MeanProfit"] = profile_df_plot["MeanProfit"] * chart_scale
+    prof_fig = create_cluster_profile_bar_chart(profile_df_plot)
+    prof_fig.update_layout(yaxis_title=f"Amount ({chart_sym})")
+    if len(prof_fig.data) > 0:
+        prof_fig.data[0].name = f"Mean Sales ({chart_sym})"
+    if len(prof_fig.data) > 1:
+        prof_fig.data[1].name = f"Mean Profit ({chart_sym})"
     st.plotly_chart(prof_fig, use_container_width=True)
 
     # Detailed Segment Cards
@@ -618,15 +780,31 @@ def render_prediction_tab(df: pd.DataFrame) -> None:
         "📉 Residual Distribution",
     ])
 
+    curr_cfg = get_currency_config()
+    chart_scale = curr_cfg["scale"]
+    chart_sym = curr_cfg["primary_symbol"]
+
     with c_tab1:
         fmt_comp = comparison_df.copy()
-        curr_label = "₹" if st.session_state.get("currency_mode", "Rupees (₹)") == "Rupees (₹)" else ("₹ / $" if "Both" in st.session_state.get("currency_mode", "") else "$")
+        curr_label = "₹" if curr_cfg["mode"] == "Rupees (₹)" else ("₹ / $" if "Both" in curr_cfg["mode"] else "$")
         if "MAE ($)" in fmt_comp.columns and "RMSE ($)" in fmt_comp.columns:
             fmt_comp[f"MAE ({curr_label})"] = fmt_comp["MAE ($)"].apply(format_currency)
             fmt_comp[f"RMSE ({curr_label})"] = fmt_comp["RMSE ($)"].apply(format_currency)
             fmt_comp = fmt_comp.drop(columns=["MAE ($)", "RMSE ($)"])
         st.dataframe(fmt_comp, use_container_width=True)
-        comp_fig = create_model_comparison_bar_chart(comparison_df)
+
+        comp_df_plot = comparison_df.copy()
+        if chart_scale != 1.0:
+            if "MAE ($)" in comp_df_plot.columns:
+                comp_df_plot["MAE ($)"] = comp_df_plot["MAE ($)"] * chart_scale
+            if "RMSE ($)" in comp_df_plot.columns:
+                comp_df_plot["RMSE ($)"] = comp_df_plot["RMSE ($)"] * chart_scale
+        comp_fig = create_model_comparison_bar_chart(comp_df_plot)
+        comp_fig.update_layout(yaxis_title=f"Error Metric Value ({chart_sym})")
+        if len(comp_fig.data) > 0:
+            comp_fig.data[0].name = f"MAE ({chart_sym})"
+        if len(comp_fig.data) > 1:
+            comp_fig.data[1].name = f"RMSE ({chart_sym})"
         st.plotly_chart(comp_fig, use_container_width=True)
 
     with c_tab2:
@@ -637,10 +815,16 @@ def render_prediction_tab(df: pd.DataFrame) -> None:
             key="parity_model_choice"
         )
         selected_eval = eval_rf if "Random Forest" in model_choice_viz else eval_lr
+        parity_y_true = selected_eval["y_true"] * chart_scale if chart_scale != 1.0 else selected_eval["y_true"]
+        parity_y_pred = selected_eval["y_pred"] * chart_scale if chart_scale != 1.0 else selected_eval["y_pred"]
         parity_fig = create_actual_vs_predicted_chart(
-            selected_eval["y_true"],
-            selected_eval["y_pred"],
+            parity_y_true,
+            parity_y_pred,
             model_name=model_choice_viz,
+        )
+        parity_fig.update_layout(
+            xaxis_title=f"Actual Sales ({chart_sym})",
+            yaxis_title=f"Predicted Sales ({chart_sym})",
         )
         st.plotly_chart(parity_fig, use_container_width=True)
 
@@ -652,9 +836,13 @@ def render_prediction_tab(df: pd.DataFrame) -> None:
             key="res_model_choice"
         )
         selected_res = eval_rf if "Random Forest" in res_model_choice else eval_lr
+        res_values = selected_res["residuals"] * chart_scale if chart_scale != 1.0 else selected_res["residuals"]
         res_fig = create_residual_distribution_chart(
-            selected_res["residuals"],
+            res_values,
             model_name=res_model_choice,
+        )
+        res_fig.update_layout(
+            xaxis_title=f"Residual Error ({chart_sym})",
         )
         st.plotly_chart(res_fig, use_container_width=True)
 
