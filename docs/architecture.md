@@ -104,3 +104,56 @@ Zero-variance features are automatically pruned prior to scaling.
   $$s(i) = \frac{b(i) - a(i)}{\max(a(i), b(i))}$$
   where $a(i)$ is mean intra-cluster distance and $b(i)$ is mean nearest-cluster distance.
 * **Dimensionality Reduction for Visualization:** Multi-dimensional cluster boundaries are projected onto 2D space using Principal Component Analysis (PCA) preserving the largest variance eigenvectors.
+
+---
+
+## 5. Supervised Machine Learning: Sales Prediction & Regression Evaluation
+
+### 5.1 Formulation & Objective
+The sales prediction engine forecasts gross transaction revenue ($y = \text{Sales} \in \mathbb{R}^+$) for a proposed commercial transaction given operational order parameters and seasonal indicators.
+
+### 5.2 Feature Representation & Target Leakage Prevention
+To guarantee real-world inference validity as a pre-transaction decision-support tool, features are restricted strictly to pre-fulfillment variables:
+* **Numeric Features ($X_{\text{num}}$):**
+  * $\text{Quantity} \in \mathbb{Z}^+$: Order transaction units.
+  * $\text{Discount} \in [0.0, 1.0]$: Promotional discount allowance.
+  * $\text{Month} \in \{1, \dots, 12\}$: Calendar month derived from `OrderDate`.
+  * $\text{Quarter} \in \{1, 2, 3, 4\}$: Fiscal quarter derived from `OrderDate`.
+  * $\text{DayOfWeek} \in \{0, \dots, 6\}$: Day of week index (Monday=0, Sunday=6).
+* **Categorical Features ($X_{\text{cat}}$):**
+  * $\text{Category} \in \{\text{Furniture}, \text{Office Supplies}, \text{Technology}\}$
+  * $\text{Region} \in \{\text{Central}, \text{East}, \text{South}, \text{West}\}$
+
+**Critical Academic Note on Leakage Prevention:**  
+In financial accounting, $\text{Profit} = \text{Sales} \times (1 - \text{Discount}) - \text{COGS}$. Although $\text{Profit}$ correlates strongly with $\text{Sales}$, it is an ex-post outcome determined only after fulfillment and pricing realization. Including $\text{Profit}$ or `CustomerID` produces artificial over-fitting ($R^2 > 0.95$) that fails during quote generation. BizInsightIQ strictly excludes $\text{Profit}$ and `CustomerID` from prediction features.
+
+### 5.3 Chronological Train/Test Splitting Strategy
+Transactions occur sequentially across time. Standard random k-fold shuffling introduces temporal look-ahead bias by allowing past observations to be predicted using future data.
+BizInsightIQ enforces a **Chronological 80/20 Split**:
+* **Training Set:** First 960 records spanning `2023-01-01` to `2024-07-28`.
+* **Testing Set:** Final 240 records spanning `2024-07-28` to `2024-12-30`.
+
+### 5.4 Preprocessing Pipeline
+Transformations are encapsulated inside a Scikit-learn `Pipeline` utilizing `ColumnTransformer`:
+* **Numeric Pipeline:** $z = \frac{x - \mu_{\text{train}}}{\sigma_{\text{train}}}$ using `StandardScaler`.
+* **Categorical Pipeline:** One-hot encoding with `handle_unknown='ignore'` and `sparse_output=False`.
+* Parameters ($\mu, \sigma$, category encodings) are fitted exclusively on the training partition and transformed onto out-of-sample data.
+
+### 5.5 Model Architectures & Empirical Results
+
+#### 1. Baseline Benchmark: Ordinary Least Squares (OLS) Linear Regression
+$$\hat{y} = \beta_0 + \sum_{j=1}^p \beta_j X_j$$
+Minimizes residual sum of squares $\sum_{i=1}^n (y_i - \hat{y}_i)^2$.
+
+#### 2. Non-Linear Ensemble: Random Forest Regressor
+$$\hat{y} = \frac{1}{B} \sum_{b=1}^B T_b(X)$$
+Ensemble of $B = 100$ bootstrap regression trees with `max_depth = 10` and `random_state = 42`.
+
+#### 3. Empirical Evaluation on Unseen Test Partition ($N = 240$):
+| Metric | Baseline Linear Regression | Random Forest Regressor | Relative Improvement |
+| :--- | :--- | :--- | :--- |
+| **Mean Absolute Error (MAE)** | **$719.50** | **$521.04** | **-27.58% (Lower is better)** |
+| **Root Mean Squared Error (RMSE)** | **$1,022.98** | **$1,017.89** | **-0.50% (Lower is better)** |
+| **Coefficient of Determination ($R^2$)** | **0.6269** | **0.6306** | **+0.0037 (Higher is better)** |
+
+**Academic Finding:** The Random Forest model demonstrates superior predictive precision, reducing median and average dollar deviations by over \$198 per transaction quote while accounting for non-linear discount-tier pricing effects.

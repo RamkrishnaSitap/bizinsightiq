@@ -1,7 +1,7 @@
 """
 BizInsightIQ — AI-Powered Business Intelligence, Predictive Analytics & Decision Support System
 MCA Final-Semester Project - Streamlit Application Dashboard
-Day 3: AI/ML Customer Segmentation (K-Means, RFM Analysis & PCA Projection)
+Day 4: Supervised Machine Learning (Sales Prediction, Regression Evaluation & What-If Simulation)
 """
 
 from pathlib import Path
@@ -31,6 +31,16 @@ from src.segmentation import (
     create_elbow_silhouette_chart,
     create_pca_cluster_chart,
     create_cluster_profile_bar_chart,
+)
+from src.prediction import (
+    prepare_prediction_data,
+    train_and_evaluate_models,
+    predict_sales,
+    create_actual_vs_predicted_chart,
+    create_residual_distribution_chart,
+    create_model_comparison_bar_chart,
+    CATEGORICAL_FEATURES,
+    NUMERIC_FEATURES,
 )
 
 
@@ -113,7 +123,7 @@ def render_sidebar() -> tuple[pd.DataFrame | None, str]:
         st.sidebar.markdown(f"- `{col}`")
 
     st.sidebar.markdown("---")
-    st.sidebar.caption("**Status:** Day 3 Completed (Customer Segmentation ML)")
+    st.sidebar.caption("**Status:** Day 4 Completed (Sales Prediction ML & Evaluation)")
 
     return df, source_name
 
@@ -433,6 +443,238 @@ def render_segmentation_tab(df: pd.DataFrame) -> None:
             )
 
 
+@st.cache_data(show_spinner=False)
+def _cached_train_models(df: pd.DataFrame, split_strategy: str, test_size: float) -> dict:
+    """Cache model training to ensure rapid UI responsiveness."""
+    return train_and_evaluate_models(df, split_strategy=split_strategy, test_size=test_size, random_state=42)
+
+
+def render_prediction_tab(df: pd.DataFrame) -> None:
+    """
+    Render supervised ML sales prediction, regression model evaluation,
+    actual vs predicted diagnostics, and what-if scenario simulator.
+    """
+    st.markdown("### 🔮 Supervised Machine Learning: Sales Prediction & Regression Evaluation")
+    st.markdown(
+        """
+        BizInsightIQ employs supervised regression algorithms to forecast transaction-level sales 
+        using historical sales records, discount allowances, and seasonal calendar markers.
+        """
+    )
+
+    # 1. Split Strategy and Model Execution
+    st.markdown("#### 1. Configure Model Training & Evaluation")
+    cfg_col1, cfg_col2 = st.columns([1, 1])
+
+    with cfg_col1:
+        split_choice = st.selectbox(
+            "Evaluation Split Strategy:",
+            options=["Chronological Split (Time-Ordered)", "Random Split (80/20 Shuffle)"],
+            index=0,
+            help="Chronological split evaluates strictly on unseen future dates, preventing temporal lookahead bias."
+        )
+        split_strategy = "chronological" if "Chronological" in split_choice else "random"
+
+    with cfg_col2:
+        test_pct = st.slider(
+            "Test Set Ratio (%):",
+            min_value=10,
+            max_value=40,
+            value=20,
+            step=5,
+            help="Percentage of transactions reserved strictly for out-of-sample model evaluation."
+        ) / 100.0
+
+    # Train and evaluate models
+    try:
+        with st.spinner("Training Linear Regression and Random Forest Regressors..."):
+            results = _cached_train_models(df, split_strategy, test_pct)
+    except Exception as e:
+        st.error(f"Error during model training and evaluation: {e}")
+        return
+
+    meta = results["metadata"]
+    comparison_df = results["comparison_df"]
+    eval_lr = results["evaluations"]["linear_regression"]
+    eval_rf = results["evaluations"]["random_forest"]
+
+    # Split metadata callout
+    st.info(
+        f"📅 **Split Diagnostics ({meta['split_strategy'].capitalize()}):** "
+        f"Training set: **{meta['train_size']:,}** records ({meta['train_period']}) | "
+        f"Test set: **{meta['test_size']:,}** records ({meta['test_period']})"
+    )
+
+    # Metric Badges
+    m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+    with m_col1:
+        st.metric(
+            label="Random Forest R²",
+            value=f"{eval_rf['r2']:.4f}",
+            delta=f"{eval_rf['r2'] - eval_lr['r2']:+.4f} vs LR",
+            help="Coefficient of Determination: Proportion of variance explained on unseen test set."
+        )
+    with m_col2:
+        st.metric(
+            label="Random Forest MAE",
+            value=f"${eval_rf['mae']:,.2f}",
+            delta=f"-${eval_lr['mae'] - eval_rf['mae']:,.2f} vs LR",
+            delta_color="inverse",
+            help="Mean Absolute Error: Average dollar deviation from actual sales."
+        )
+    with m_col3:
+        st.metric(
+            label="Random Forest RMSE",
+            value=f"${eval_rf['rmse']:,.2f}",
+            delta=f"-${eval_lr['rmse'] - eval_rf['rmse']:,.2f} vs LR",
+            delta_color="inverse",
+            help="Root Mean Squared Error: Penalizes larger prediction errors."
+        )
+    with m_col4:
+        st.metric(
+            label="Baseline (Linear Reg) R²",
+            value=f"{eval_lr['r2']:.4f}",
+            help="Standard OLS benchmark model performance on identical test split."
+        )
+
+    st.divider()
+
+    # 2. Model Performance Comparison Table and Charts
+    st.markdown("#### 2. Comparative Evaluation Metrics")
+    c_tab1, c_tab2, c_tab3 = st.tabs([
+        "📊 Model Comparison Bar Chart",
+        "🎯 Actual vs. Predicted Parity",
+        "📉 Residual Distribution",
+    ])
+
+    with c_tab1:
+        st.dataframe(comparison_df, use_container_width=True)
+        comp_fig = create_model_comparison_bar_chart(comparison_df)
+        st.plotly_chart(comp_fig, use_container_width=True)
+
+    with c_tab2:
+        model_choice_viz = st.radio(
+            "Select Model for Parity Diagnostic:",
+            options=["Random Forest Regressor", "Linear Regression (Baseline)"],
+            horizontal=True,
+            key="parity_model_choice"
+        )
+        selected_eval = eval_rf if "Random Forest" in model_choice_viz else eval_lr
+        parity_fig = create_actual_vs_predicted_chart(
+            selected_eval["y_true"],
+            selected_eval["y_pred"],
+            model_name=model_choice_viz,
+        )
+        st.plotly_chart(parity_fig, use_container_width=True)
+
+    with c_tab3:
+        res_model_choice = st.radio(
+            "Select Model for Residual Diagnostic:",
+            options=["Random Forest Regressor", "Linear Regression (Baseline)"],
+            horizontal=True,
+            key="res_model_choice"
+        )
+        selected_res = eval_rf if "Random Forest" in res_model_choice else eval_lr
+        res_fig = create_residual_distribution_chart(
+            selected_res["residuals"],
+            model_name=res_model_choice,
+        )
+        st.plotly_chart(res_fig, use_container_width=True)
+
+    st.divider()
+
+    # 3. Interactive What-If Scenario Simulator
+    st.markdown("#### 3. 🎯 Interactive 'What-If' Scenario Simulator")
+    st.caption("Forecast gross transaction revenue for hypothetical business quotes and order scenarios.")
+
+    categories = sorted(df["Category"].dropna().unique().tolist())
+    regions = sorted(df["Region"].dropna().unique().tolist())
+
+    with st.form("what_if_prediction_form"):
+        sim_col1, sim_col2, sim_col3 = st.columns(3)
+
+        with sim_col1:
+            cat_input = st.selectbox("Product Category:", options=categories, index=0)
+            region_input = st.selectbox("Target Region:", options=regions, index=0)
+            model_engine = st.selectbox(
+                "Prediction Model:",
+                options=["Random Forest Regressor (Recommended)", "Linear Regression (Baseline)"],
+                index=0
+            )
+
+        with sim_col2:
+            qty_input = st.number_input("Order Quantity:", min_value=1, max_value=100, value=5, step=1)
+            discount_input = st.slider("Promotional Discount (%):", min_value=0, max_value=70, value=15, step=5) / 100.0
+
+        with sim_col3:
+            month_names = [
+                "1 - January", "2 - February", "3 - March", "4 - April",
+                "5 - May", "6 - June", "7 - July", "8 - August",
+                "9 - September", "10 - October", "11 - November", "12 - December"
+            ]
+            month_choice = st.selectbox("Order Month:", options=month_names, index=5)
+            month_input = int(month_choice.split(" - ")[0])
+            quarter_input = (month_input - 1) // 3 + 1
+
+            day_names = ["0 - Monday", "1 - Tuesday", "2 - Wednesday", "3 - Thursday", "4 - Friday", "5 - Saturday", "6 - Sunday"]
+            day_choice = st.selectbox("Day of Week:", options=day_names, index=2)
+            day_input = int(day_choice.split(" - ")[0])
+
+        submit_scenario = st.form_submit_button("🔮 Calculate Predicted Sales")
+
+    # Generate prediction
+    selected_pipeline = results["models"]["random_forest"] if "Random Forest" in model_engine else results["models"]["linear_regression"]
+    scenario_input = {
+        "Quantity": qty_input,
+        "Discount": discount_input,
+        "Category": cat_input,
+        "Region": region_input,
+        "Month": month_input,
+        "Quarter": quarter_input,
+        "DayOfWeek": day_input,
+    }
+
+    pred_val = predict_sales(selected_pipeline, scenario_input)
+    implied_unit_price = pred_val / qty_input if qty_input > 0 else 0.0
+
+    st.markdown("##### 📌 Forecast Result:")
+    res_card1, res_card2, res_card3 = st.columns(3)
+    with res_card1:
+        st.metric(
+            label=f"Predicted Gross Sales ({model_engine.split(' ')[0]} {model_engine.split(' ')[1]})",
+            value=f"${pred_val:,.2f}"
+        )
+    with res_card2:
+        st.metric(
+            label="Implied Unit Realization",
+            value=f"${implied_unit_price:,.2f} / unit"
+        )
+    with res_card3:
+        st.metric(
+            label="Discount Allowance Applied",
+            value=f"{discount_input * 100:.0f}%"
+        )
+
+    st.divider()
+
+    # 4. Target Leakage Prevention & Academic Rigor
+    st.markdown("#### 4. 🛡️ Academic Methodology: Target Leakage Prevention")
+    st.info(
+        """
+        **Why is `Profit` excluded from prediction features?**
+        
+        In retail financial accounting, `Profit` is derived directly from `Sales` 
+        ($\\text{Profit} = \\text{Sales} \\times (1 - \\text{Discount}) - \\text{COGS}$). Including `Profit` in 
+        training data constitutes severe **Target Leakage**, giving the model future knowledge of financial outcomes 
+        and yielding artificial $R^2 > 0.95$. 
+        
+        BizInsightIQ strictly enforces pre-transaction feature boundaries (`Category`, `Region`, `Quantity`, 
+        `Discount`, and calendar seasonality), ensuring the system functions reliably as an operational 
+        decision-support tool for sales quotes before orders are fulfilled.
+        """
+    )
+
+
 def render_roadmap_tab() -> None:
     """Render architecture overview and multi-day project delivery roadmap."""
     st.markdown("### 🚀 Project Architecture & Roadmap")
@@ -452,10 +694,10 @@ def render_roadmap_tab() -> None:
 
     with col2:
         st.success("**Day 3 (Completed)**\n- Customer Segmentation (`src/segmentation.py`)\n- RFM / Behavioral Feature Scaling\n- K-Means Clustering & PCA Projection\n- 48 Total Unit Tests Passed")
-        st.info("**Day 4 (Next Phase)**\n- Sales Forecasting Regression (`src/prediction.py`)\n- Feature Engineering & Train/Test Split\n- Linear Regression vs Random Forest\n- Metrics: $R^2$, RMSE, MAE")
+        st.success("**Day 4 (Completed)**\n- Sales Forecasting Regression (`src/prediction.py`)\n- Feature Engineering & Chronological Split\n- Linear Regression vs Random Forest\n- Metrics: $R^2$, RMSE, MAE (70 Tests Passed)")
 
     with col3:
-        st.warning("**Day 5 (Integration & Polish)**\n- Automated Decision Support Engine (`src/insights.py`)\n- Full UI Integration & Error Hardening\n- Optional FastAPI REST Wrapper")
+        st.info("**Day 5 (Next Phase)**\n- Automated Decision Support Engine (`src/insights.py`)\n- Full UI Integration & Error Hardening\n- Optional FastAPI REST Wrapper")
         st.warning("**Day 6 (Academic Deliverables)**\n- Empirical Report Evidence\n- High-Res Architecture Diagrams\n- Metric Tables for Project Report\n- Viva Presentation Preparation")
 
     st.divider()
@@ -468,8 +710,9 @@ def render_roadmap_tab() -> None:
         │   ├── data_loader.py    <-- File & buffer ingestion
         │   ├── validator.py      <-- Schema and business constraint validation
         │   ├── eda.py            <-- Analytical KPIs, trends, and charts
-        │   └── segmentation.py   <-- K-Means clustering, PCA projection, & profiling
-        ├── tests/                <-- Automated Pytest Suite (48 passed tests)
+        │   ├── segmentation.py   <-- K-Means clustering, PCA projection, & profiling
+        │   └── prediction.py     <-- Supervised regression, evaluation & what-if
+        ├── tests/                <-- Automated Pytest Suite (70 passed tests)
         ├── docs/                 <-- System architecture & API documentation
         └── .env.example          <-- Externalized configuration for future stack
         """,
@@ -483,10 +726,11 @@ def main() -> None:
     df, source_name = render_sidebar()
 
     if df is not None:
-        tab_validate, tab_eda, tab_segmentation, tab_roadmap = st.tabs([
+        tab_validate, tab_eda, tab_segmentation, tab_prediction, tab_roadmap = st.tabs([
             "📋 Data Ingestion & Validation",
             "📊 Exploratory Data Analysis (EDA)",
             "🎯 Customer Segmentation (K-Means)",
+            "🔮 Sales Prediction (Regression)",
             "🚀 System Architecture & Roadmap",
         ])
 
@@ -504,6 +748,12 @@ def main() -> None:
                 render_segmentation_tab(df)
             else:
                 st.error("Cannot perform Customer Segmentation on an invalid dataset. Please resolve validation errors in the first tab.")
+
+        with tab_prediction:
+            if is_valid:
+                render_prediction_tab(df)
+            else:
+                st.error("Cannot perform Sales Prediction on an invalid dataset. Please resolve validation errors in the first tab.")
 
         with tab_roadmap:
             render_roadmap_tab()
