@@ -110,18 +110,23 @@ The application will launch and be accessible in your default web browser at:
 MCA_AI_ML_Project_and_Report/
 └── BizInsightIQ/
     ├── .gitignore               # Ignored environments, cache, and OS artifacts
+    ├── .env.example             # Externalized configuration template
     ├── requirements.txt         # Pinned production dependencies
     ├── pytest.ini               # Pytest configuration and pythonpath definition
     ├── README.md                # Project documentation and setup guide
-    ├── app.py                   # Main Streamlit web application
+    ├── app.py                   # Main Streamlit web application (Ingestion + EDA)
     ├── data/
     │   └── sample_sales_data.csv# Bundled synthetic sales dataset (1,200 rows)
+    ├── docs/
+    │   └── architecture.md      # Modular architecture and extensibility design
     ├── src/
     │   ├── __init__.py          # Package initializer
     │   ├── data_loader.py       # Robust CSV loading utility
-    │   └── validator.py         # Schema and business rule validation engine
+    │   ├── validator.py         # Schema and business rule validation engine
+    │   └── eda.py               # Framework-agnostic EDA computations & charts
     └── tests/
-        └── test_validation.py   # Pytest automated test suite (15 test cases)
+        ├── test_validation.py   # Pytest automated test suite (15 test cases)
+        └── test_eda.py          # Pytest EDA analytical test suite (16 test cases)
 ```
 
 ---
@@ -129,8 +134,8 @@ MCA_AI_ML_Project_and_Report/
 ## 7. Current Progress & Development Roadmap
 
 - [x] **Day 1 (Completed):** Python 3.12 environment setup, reproducible sample dataset generation (1,200 rows), CSV data loader, data validator, Pytest test suite (15 passed), and initial Streamlit dashboard skeleton.
-- [ ] **Day 2 (Next):** Exploratory Data Analysis (EDA) module with interactive Plotly visualizers (Sales Trends, Category Performance, Regional Distributions).
-- [ ] **Day 3:** Unsupervised Machine Learning — K-Means Customer Segmentation with Elbow Method and Silhouette evaluation.
-- [ ] **Day 4:** Supervised Machine Learning — Sales Prediction Regression models with $R^2$, RMSE, and MAE evaluation metrics.
+- [x] **Day 2 (Completed):** Framework-agnostic EDA engine (`src/eda.py`), interactive Plotly visualizers (Sales Trends, Category Performance, Regional Distributions, Discount Impact, Correlation Heatmap), full UI integration in `app.py`, and 31 passed unit tests.
+- [ ] **Day 3 (Next):** Unsupervised Machine Learning — K-Means Customer Segmentation (`src/segmentation.py`) with Elbow Method and Silhouette evaluation.
+- [ ] **Day 4:** Supervised Machine Learning — Sales Prediction Regression models (`src/prediction.py`) with $R^2$, RMSE, and MAE evaluation metrics.
 - [ ] **Day 5:** Decision Support Engine — Automated business insight generation and full UI integration.
 - [ ] **Day 6:** Final End-to-End System Verification, Performance Tables, and MCA Project Report Evidence compilation.
