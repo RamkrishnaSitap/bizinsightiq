@@ -169,6 +169,177 @@ def format_currency(
         return f"{inr_str} ({usd_str})"
 
 
+ONES_WORDS = [
+    "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+    "Seventeen", "Eighteen", "Nineteen"
+]
+TENS_WORDS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
+
+
+def _two_digits_to_words(n: int) -> str:
+    """Convert a two-digit integer into words with standard hyphenation."""
+    if n < 20:
+        return ONES_WORDS[n]
+    tens = TENS_WORDS[n // 10]
+    units = ONES_WORDS[n % 10]
+    return f"{tens}-{units}" if units else tens
+
+
+def _three_digits_to_words(n: int) -> str:
+    """Convert a three-digit integer into words."""
+    hundreds = n // 100
+    rem = n % 100
+    parts = []
+    if hundreds:
+        parts.append(f"{ONES_WORDS[hundreds]} Hundred")
+    if rem:
+        parts.append(_two_digits_to_words(rem))
+    return " ".join(parts)
+
+
+def number_to_words_indian(n: int) -> str:
+    """Convert integer to words using the Indian Numbering System (Crore, Lakh, Thousand)."""
+    if n == 0:
+        return "Zero"
+    if n < 0:
+        return f"Minus {number_to_words_indian(abs(n))}"
+
+    crore = n // 10000000
+    n %= 10000000
+    lakh = n // 100000
+    n %= 100000
+    thousand = n // 1000
+    n %= 1000
+    hundred = n // 100
+    rem = n % 100
+
+    parts = []
+    if crore:
+        parts.append(f"{number_to_words_indian(crore)} Crore")
+    if lakh:
+        parts.append(f"{_two_digits_to_words(lakh)} Lakh")
+    if thousand:
+        parts.append(f"{_two_digits_to_words(thousand)} Thousand")
+    if hundred:
+        parts.append(f"{ONES_WORDS[hundred]} Hundred")
+    if rem:
+        parts.append(_two_digits_to_words(rem))
+    return " ".join(parts)
+
+
+def number_to_words_international(n: int) -> str:
+    """Convert integer to words using the International Numbering System (Billion, Million, Thousand)."""
+    if n == 0:
+        return "Zero"
+    if n < 0:
+        return f"Minus {number_to_words_international(abs(n))}"
+
+    scales = [
+        (1000000000000, "Trillion"),
+        (1000000000, "Billion"),
+        (1000000, "Million"),
+        (1000, "Thousand"),
+    ]
+    parts = []
+    for scale, name in scales:
+        if n >= scale:
+            count = n // scale
+            n %= scale
+            parts.append(f"{number_to_words_international(count)} {name}")
+    if n > 0:
+        parts.append(_three_digits_to_words(n))
+    return " ".join(parts)
+
+
+def amount_to_words(
+    val: float,
+    mode: str | None = None,
+    rate: float | None = None,
+    source_currency: str | None = None,
+) -> str:
+    """
+    Generate readable text amount (words and compact abbreviation) for mouseover hover popups.
+
+    Returns a clean multi-line string suitable for Streamlit help tooltips and HTML title popups.
+    """
+    if pd.isna(val):
+        return "N/A"
+    try:
+        val_float = float(val)
+    except (ValueError, TypeError):
+        return str(val)
+
+    if mode is None:
+        mode = st.session_state.get("currency_mode", "Rupees (₹)")
+    if rate is None:
+        rate = float(st.session_state.get("exchange_rate", 83.0))
+    if source_currency is None:
+        source_currency = st.session_state.get("data_currency", "US Dollars ($)")
+
+    is_source_inr = "Rupees" in source_currency or "INR" in source_currency or "₹" in source_currency
+    if is_source_inr:
+        inr_val = val_float
+        usd_val = val_float / rate if rate > 0 else val_float
+    else:
+        usd_val = val_float
+        inr_val = val_float * rate
+
+    def _compact_inr(v: float) -> str:
+        av = abs(v)
+        sign = "-" if v < 0 else ""
+        if av >= 10000000:
+            return f"{sign}₹{av / 10000000:.2f} Cr (Crore)"
+        elif av >= 100000:
+            return f"{sign}₹{av / 100000:.2f} L (Lakh)"
+        elif av >= 1000:
+            return f"{sign}₹{av / 1000:.2f} K (Thousand)"
+        else:
+            return f"{sign}₹{av:,.2f}"
+
+    def _compact_usd(v: float) -> str:
+        av = abs(v)
+        sign = "-" if v < 0 else ""
+        if av >= 1000000000:
+            return f"{sign}${av / 1000000000:.2f} B (Billion)"
+        elif av >= 1000000:
+            return f"{sign}${av / 1000000:.2f} M (Million)"
+        elif av >= 1000:
+            return f"{sign}${av / 1000:.2f} K (Thousand)"
+        else:
+            return f"{sign}${av:,.2f}"
+
+    # INR in words
+    int_inr = int(abs(inr_val))
+    paise = int(round((abs(inr_val) - int_inr) * 100))
+    inr_words = number_to_words_indian(int_inr) + " Rupees"
+    if paise > 0:
+        inr_words += f" and {_two_digits_to_words(paise)} Paise"
+    if inr_val < 0:
+        inr_words = f"Minus {inr_words}"
+
+    # USD in words
+    int_usd = int(abs(usd_val))
+    cents = int(round((abs(usd_val) - int_usd) * 100))
+    usd_words = number_to_words_international(int_usd) + " Dollars"
+    if cents > 0:
+        usd_words += f" and {_two_digits_to_words(cents)} Cents"
+    if usd_val < 0:
+        usd_words = f"Minus {usd_words}"
+
+    if mode == "Rupees (₹)":
+        return f"{_compact_inr(inr_val)}\n\nIn Words: {inr_words}"
+    elif mode == "US Dollars ($)":
+        return f"{_compact_usd(usd_val)}\n\nIn Words: {usd_words}"
+    else:  # "Both (₹ & $)"
+        return (
+            f"INR: {_compact_inr(inr_val)}\n"
+            f"Words: {inr_words}\n\n"
+            f"USD: {_compact_usd(usd_val)}\n"
+            f"Words: {usd_words}"
+        )
+
+
 def set_page_layout() -> None:
     """Configure page settings and theme layout."""
     st.set_page_config(
@@ -403,9 +574,17 @@ def render_eda_tab(df: pd.DataFrame) -> None:
     kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5, kpi_col6 = st.columns(6)
 
     with kpi_col1:
-        st.metric("Total Revenue", format_currency(kpis['total_sales']))
+        st.metric(
+            "Total Revenue",
+            format_currency(kpis['total_sales']),
+            help=f"**Gross Revenue**\n\n{amount_to_words(kpis['total_sales'])}"
+        )
     with kpi_col2:
-        st.metric("Total Profit", format_currency(kpis['total_profit']))
+        st.metric(
+            "Total Profit",
+            format_currency(kpis['total_profit']),
+            help=f"**Net Profit**\n\n{amount_to_words(kpis['total_profit'])}"
+        )
     with kpi_col3:
         st.metric("Profit Margin", f"{kpis['profit_margin_pct']:.1f}%")
     with kpi_col4:
@@ -413,7 +592,11 @@ def render_eda_tab(df: pd.DataFrame) -> None:
     with kpi_col5:
         st.metric("Unique Customers", f"{kpis['unique_customers']:,}")
     with kpi_col6:
-        st.metric("Avg Order Value", format_currency(kpis['avg_order_value']))
+        st.metric(
+            "Avg Order Value",
+            format_currency(kpis['avg_order_value']),
+            help=f"**Average Order Value (AOV)**\n\n{amount_to_words(kpis['avg_order_value'])}"
+        )
 
     st.divider()
 
@@ -550,7 +733,11 @@ def render_segmentation_tab(df: pd.DataFrame) -> None:
     with m1:
         st.metric("Total Customers", f"{n_customers:,}")
     with m2:
-        st.metric("Median Customer Spend", format_currency(customer_df['MonetaryValue'].median()))
+        st.metric(
+            "Median Customer Spend",
+            format_currency(customer_df['MonetaryValue'].median()),
+            help=f"**Median Customer Spend**\n\n{amount_to_words(customer_df['MonetaryValue'].median())}"
+        )
     with m3:
         st.metric("Median Recency", f"{int(customer_df['Recency'].median())} days")
     with m4:
@@ -658,6 +845,8 @@ def render_segmentation_tab(df: pd.DataFrame) -> None:
     card_cols = st.columns(k_val)
     for idx, row in profile_df.iterrows():
         c_num = int(row["Cluster"])
+        spend_popup = amount_to_words(row['MeanSales']).replace('\n', ' &#10; ')
+        profit_popup = amount_to_words(row['MeanProfit']).replace('\n', ' &#10; ')
         with card_cols[c_num]:
             st.markdown(
                 f"""
@@ -665,8 +854,8 @@ def render_segmentation_tab(df: pd.DataFrame) -> None:
                     <h4 style="margin:0;">Cluster {c_num}</h4>
                     <p style="color:#d69e2e; font-weight:bold; margin-bottom:8px;">{row['DescriptivePersona']}</p>
                     <p style="margin:2px 0;"><b>Size:</b> {row['CustomerCount']} ({row['CustomerPct']}%)</p>
-                    <p style="margin:2px 0;"><b>Avg Spend:</b> {format_currency(row['MeanSales'])}</p>
-                    <p style="margin:2px 0;"><b>Avg Profit:</b> {format_currency(row['MeanProfit'])}</p>
+                    <p style="margin:2px 0;"><b>Avg Spend:</b> <span title="{spend_popup}" style="cursor:help; border-bottom:1px dotted #a0aec0;">{format_currency(row['MeanSales'])}</span></p>
+                    <p style="margin:2px 0;"><b>Avg Profit:</b> <span title="{profit_popup}" style="cursor:help; border-bottom:1px dotted #a0aec0;">{format_currency(row['MeanProfit'])}</span></p>
                     <p style="margin:2px 0;"><b>Margin:</b> {row['ProfitMarginPct']:.1f}%</p>
                     <p style="margin:2px 0;"><b>Avg Recency:</b> {row['MeanRecencyDays']:.0f} days</p>
                     <p style="margin:2px 0;"><b>Avg Discount:</b> {row['MeanDiscountPct']:.1f}%</p>
@@ -753,7 +942,7 @@ def render_prediction_tab(df: pd.DataFrame) -> None:
             value=format_currency(eval_rf['mae']),
             delta=f"-{format_currency(eval_lr['mae'] - eval_rf['mae'])} vs LR",
             delta_color="inverse",
-            help="Mean Absolute Error: Average deviation from actual sales in selected currency."
+            help=f"**Mean Absolute Error (MAE):** Average deviation from actual sales.\n\n{amount_to_words(eval_rf['mae'])}"
         )
     with m_col3:
         st.metric(
@@ -761,7 +950,7 @@ def render_prediction_tab(df: pd.DataFrame) -> None:
             value=format_currency(eval_rf['rmse']),
             delta=f"-{format_currency(eval_lr['rmse'] - eval_rf['rmse'])} vs LR",
             delta_color="inverse",
-            help="Root Mean Squared Error: Penalizes larger prediction errors."
+            help=f"**Root Mean Squared Error (RMSE):** Penalizes larger prediction errors.\n\n{amount_to_words(eval_rf['rmse'])}"
         )
     with m_col4:
         st.metric(
@@ -907,12 +1096,14 @@ def render_prediction_tab(df: pd.DataFrame) -> None:
     with res_card1:
         st.metric(
             label=f"Predicted Gross Sales ({model_engine.split(' ')[0]} {model_engine.split(' ')[1]})",
-            value=format_currency(pred_val)
+            value=format_currency(pred_val),
+            help=f"**Forecast Gross Sales**\n\n{amount_to_words(pred_val)}"
         )
     with res_card2:
         st.metric(
             label="Implied Unit Realization",
-            value=f"{format_currency(implied_unit_price)} / unit"
+            value=f"{format_currency(implied_unit_price)} / unit",
+            help=f"**Implied Revenue Per Unit**\n\n{amount_to_words(implied_unit_price)}"
         )
     with res_card3:
         st.metric(
@@ -1031,6 +1222,8 @@ def render_insights_tab(df: pd.DataFrame) -> None:
             is_monetary = any(term in k.lower() for term in ["sales", "profit", "spend", "loss", "revenue", "cogs", "price"]) and not any(term in k.lower() for term in ["pct", "margin", "ratio", "count", "days"])
             if isinstance(v, (int, float)) and is_monetary:
                 v_formatted = format_currency(v)
+                v_tooltip = amount_to_words(v).replace("\n", " &#10; ")
+                v_formatted = f'<span title="{v_tooltip}" style="cursor:help; border-bottom:1px dotted #a0aec0;">{v_formatted}</span>'
             elif isinstance(v, float):
                 v_formatted = f"{v:,.2f}"
             elif isinstance(v, int):
