@@ -1,7 +1,6 @@
 # AI-Powered Business Intelligence, Predictive Analytics and Decision Support System
 
-**Academic Degree:** Master of Computer Applications (MCA)  
-**Project Phase:** Day 5 Implementation (Decision Support & Actionable Business Insights Engine)
+**Academic Degree:** Master of Computer Applications (MCA)
 
 ---
 
