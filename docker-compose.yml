@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bizinsightiq_postgres
+    restart: unless-stopped
+    ports:
+      # Bind strictly to localhost loopback to prevent public exposure
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bizinsightiq_db}
+      POSTGRES_USER: ${POSTGRES_USER:-bizinsight_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bizinsight_secret_pass}
+    volumes:
+      # Persistent named volume for PostgreSQL data files
+      - bizinsightiq_pgdata:/var/lib/postgresql/data
+      # Mount Flyway migrations for automatic initialization when spun up in Docker
+      - ./src/main/resources/db/migration:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bizinsight_user} -d ${POSTGRES_DB:-bizinsightiq_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  bizinsightiq_pgdata:
+    name: bizinsightiq_pgdata

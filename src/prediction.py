@@ -6,9 +6,14 @@ Linear Regression and Random Forest training, regression evaluation metrics,
 what-if scenario inference, and Plotly diagnostic visualizations.
 """
 
+import time
+from pathlib import Path
 from typing import Dict, Any, List, Tuple, Union, Optional
 import pandas as pd
 import numpy as np
+import joblib
+import shap
+from xgboost import XGBRegressor
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
@@ -186,8 +191,21 @@ def build_prediction_pipeline(
         }
         default_rf_params.update(kwargs)
         estimator = RandomForestRegressor(**default_rf_params)
+    elif model_type == "xgboost":
+        default_xgb_params = {
+            "n_estimators": 100,
+            "max_depth": 6,
+            "learning_rate": 0.1,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": random_state,
+            "n_jobs": -1,
+            "objective": "reg:squarederror",
+        }
+        default_xgb_params.update(kwargs)
+        estimator = XGBRegressor(**default_xgb_params)
     else:
-        raise ValueError(f"Unsupported model_type: '{model_type}'. Choose 'linear_regression' or 'random_forest'.")
+        raise ValueError(f"Unsupported model_type: '{model_type}'. Choose 'linear_regression', 'random_forest', or 'xgboost'.")
 
     return Pipeline([
         ("preprocessor", preprocessor),
@@ -288,14 +306,25 @@ def train_and_evaluate_models(
     )
 
     # 1. Train Linear Regression
+    t0_lr = time.perf_counter()
     pipe_lr = build_prediction_pipeline("linear_regression")
     pipe_lr.fit(X_train, y_train)
     eval_lr = evaluate_regression_model(pipe_lr, X_test, y_test)
+    eval_lr["training_time"] = round(time.perf_counter() - t0_lr, 4)
 
     # 2. Train Random Forest Regressor
+    t0_rf = time.perf_counter()
     pipe_rf = build_prediction_pipeline("random_forest", random_state=random_state)
     pipe_rf.fit(X_train, y_train)
     eval_rf = evaluate_regression_model(pipe_rf, X_test, y_test)
+    eval_rf["training_time"] = round(time.perf_counter() - t0_rf, 4)
+
+    # 3. Train XGBoost Regressor
+    t0_xgb = time.perf_counter()
+    pipe_xgb = build_prediction_pipeline("xgboost", random_state=random_state)
+    pipe_xgb.fit(X_train, y_train)
+    eval_xgb = evaluate_regression_model(pipe_xgb, X_test, y_test)
+    eval_xgb["training_time"] = round(time.perf_counter() - t0_xgb, 4)
 
     # Construct model comparison DataFrame
     comparison_df = pd.DataFrame([
@@ -304,14 +333,42 @@ def train_and_evaluate_models(
             "MAE ($)": eval_lr["mae"],
             "RMSE ($)": eval_lr["rmse"],
             "R² Score": eval_lr["r2"],
+            "Training Time (s)": eval_lr["training_time"],
             "Test Samples": eval_lr["test_size"],
+            "model": "Linear Regression (Baseline)",
+            "mae": eval_lr["mae"],
+            "rmse": eval_lr["rmse"],
+            "r2": eval_lr["r2"],
+            "training_time": eval_lr["training_time"],
+            "test_size": eval_lr["test_size"],
         },
         {
             "Model": "Random Forest Regressor",
             "MAE ($)": eval_rf["mae"],
             "RMSE ($)": eval_rf["rmse"],
             "R² Score": eval_rf["r2"],
+            "Training Time (s)": eval_rf["training_time"],
             "Test Samples": eval_rf["test_size"],
+            "model": "Random Forest Regressor",
+            "mae": eval_rf["mae"],
+            "rmse": eval_rf["rmse"],
+            "r2": eval_rf["r2"],
+            "training_time": eval_rf["training_time"],
+            "test_size": eval_rf["test_size"],
+        },
+        {
+            "Model": "XGBoost Regressor",
+            "MAE ($)": eval_xgb["mae"],
+            "RMSE ($)": eval_xgb["rmse"],
+            "R² Score": eval_xgb["r2"],
+            "Training Time (s)": eval_xgb["training_time"],
+            "Test Samples": eval_xgb["test_size"],
+            "model": "XGBoost Regressor",
+            "mae": eval_xgb["mae"],
+            "rmse": eval_xgb["rmse"],
+            "r2": eval_xgb["r2"],
+            "training_time": eval_xgb["training_time"],
+            "test_size": eval_xgb["test_size"],
         },
     ])
 
@@ -320,10 +377,12 @@ def train_and_evaluate_models(
         "models": {
             "linear_regression": pipe_lr,
             "random_forest": pipe_rf,
+            "xgboost": pipe_xgb,
         },
         "evaluations": {
             "linear_regression": eval_lr,
             "random_forest": eval_rf,
+            "xgboost": eval_xgb,
         },
         "metadata": metadata,
     }
@@ -377,6 +436,55 @@ def predict_sales(
     predictions = np.maximum(predictions, 0.0).round(2)
 
     return float(predictions[0]) if single_input else predictions
+
+
+def save_model(model: Pipeline, filepath: Union[str, Path]) -> str:
+    """
+    Serialize a trained Scikit-learn regression pipeline to disk using joblib.
+
+    Parameters
+    ----------
+    model : Pipeline
+        Fitted Scikit-learn regression pipeline.
+    filepath : Union[str, Path]
+        Target destination path for .joblib file.
+
+    Returns
+    -------
+    str
+        Absolute file path where the model was persisted.
+    """
+    if not isinstance(model, Pipeline):
+        raise TypeError(f"Expected a Scikit-learn Pipeline instance, got {type(model).__name__}")
+
+    path = Path(filepath)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(model, path)
+    return str(path.resolve())
+
+
+def load_model(filepath: Union[str, Path]) -> Pipeline:
+    """
+    Deserialize and restore a trained Scikit-learn regression pipeline from disk.
+
+    Parameters
+    ----------
+    filepath : Union[str, Path]
+        Source .joblib model file path.
+
+    Returns
+    -------
+    Pipeline
+        Fitted Scikit-learn regression pipeline ready for inference.
+    """
+    path = Path(filepath)
+    if not path.exists():
+        raise FileNotFoundError(f"Model file not found at: {path}")
+
+    model = joblib.load(path)
+    if not isinstance(model, Pipeline):
+        raise TypeError(f"Loaded object is not a Scikit-learn Pipeline (got {type(model).__name__})")
+    return model
 
 
 # ---------------------------------------------------------------------------
@@ -477,3 +585,322 @@ def create_model_comparison_bar_chart(comparison_df: pd.DataFrame) -> go.Figure:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
     return fig
+
+
+# ---------------------------------------------------------------------------
+# 6. Explainable AI (SHAP Feature Attributions)
+# ---------------------------------------------------------------------------
+
+def explain_prediction(
+    model: Pipeline,
+    input_data: Union[Dict[str, Any], pd.DataFrame],
+    background_data: Optional[pd.DataFrame] = None,
+) -> Dict[str, Any]:
+    """
+    Deconstruct an individual sales prediction using SHAP (SHapley Additive exPlanations).
+
+    Respects the full Scikit-learn Pipeline (preprocessing + estimator).
+    Dynamically selects TreeExplainer for tree ensembles (RandomForest, XGBoost)
+    and LinearExplainer for Linear Regression. Aggregates one-hot encoded categories
+    back to their original business entities while preserving mathematical additivity:
+        Expected Base Value + Sum(SHAP Values) == Predicted Sales
+
+    Parameters
+    ----------
+    model : Pipeline
+        Fitted Scikit-learn regression pipeline.
+    input_data : Union[Dict[str, Any], pd.DataFrame]
+        Input scenario features (Category, Region, Quantity, Discount, Month, Quarter, DayOfWeek).
+    background_data : Optional[pd.DataFrame], default None
+        Optional reference dataset used as background distribution for baseline expectations.
+
+    Returns
+    -------
+    Dict[str, Any]
+        Dictionary of attributions, baseline expectation, verification metrics, and interpretations.
+    """
+    if not isinstance(model, Pipeline):
+        raise TypeError(f"Expected a Scikit-learn Pipeline instance, got {type(model).__name__}")
+
+    if "preprocessor" not in model.named_steps or "regressor" not in model.named_steps:
+        raise ValueError("Pipeline must contain 'preprocessor' and 'regressor' named steps.")
+
+    if isinstance(input_data, dict):
+        input_df = pd.DataFrame([input_data])
+    elif isinstance(input_data, pd.DataFrame):
+        input_df = input_data.copy()
+    else:
+        raise TypeError(f"input_data must be dict or DataFrame, received {type(input_data).__name__}")
+
+    # Validate required features
+    missing = [c for c in ALL_FEATURE_COLUMNS if c not in input_df.columns]
+    if missing:
+        raise ValueError(f"Input data missing required features: {', '.join(missing)}")
+
+    preprocessor = model.named_steps["preprocessor"]
+    regressor = model.named_steps["regressor"]
+
+    # Transform input scenario features through fitted preprocessor
+    X_trans = preprocessor.transform(input_df[ALL_FEATURE_COLUMNS])
+    transformed_feature_names = list(preprocessor.get_feature_names_out())
+
+    # Raw model prediction
+    raw_pred = float(regressor.predict(X_trans)[0])
+    clamped_pred = round(max(raw_pred, 0.0), 2)
+
+    # Initialize SHAP explainer based on model architecture
+    if isinstance(regressor, (RandomForestRegressor, XGBRegressor)):
+        explainer = shap.TreeExplainer(regressor)
+        shap_res = explainer(X_trans)
+        shap_vals = shap_res.values[0]
+        base_val = explainer.expected_value
+        if isinstance(base_val, (list, np.ndarray)):
+            base_val = float(base_val[0])
+        else:
+            base_val = float(base_val)
+        explainer_type = f"TreeExplainer ({type(regressor).__name__})"
+    elif isinstance(regressor, LinearRegression):
+        if background_data is not None and len(background_data) > 0:
+            bg_df = background_data[ALL_FEATURE_COLUMNS] if isinstance(background_data, pd.DataFrame) else pd.DataFrame(background_data)
+            bg_trans = preprocessor.transform(bg_df.iloc[:100])
+        else:
+            # Baseline is mean of standardized features (zeros for numeric)
+            bg_trans = np.zeros((1, len(transformed_feature_names)))
+        explainer = shap.LinearExplainer(regressor, bg_trans)
+        shap_res = explainer(X_trans)
+        shap_vals = shap_res.values[0]
+        base_val = float(explainer.expected_value)
+        explainer_type = "LinearExplainer (LinearRegression)"
+    else:
+        # General Explainer fallback
+        if background_data is not None and len(background_data) > 0:
+            bg_trans = preprocessor.transform(background_data[ALL_FEATURE_COLUMNS].iloc[:50])
+        else:
+            bg_trans = np.zeros((1, len(transformed_feature_names)))
+        explainer = shap.Explainer(regressor.predict, bg_trans)
+        shap_res = explainer(X_trans)
+        shap_vals = shap_res.values[0]
+        base_val = float(explainer.expected_value if hasattr(explainer, "expected_value") else raw_pred)
+        explainer_type = f"GeneralExplainer ({type(regressor).__name__})"
+
+    # 1. Capture raw transformed feature contributions
+    raw_contributions = []
+    for name, val in zip(transformed_feature_names, shap_vals):
+        raw_contributions.append({
+            "feature": name,
+            "contribution": round(float(val), 2),
+        })
+
+    # 2. Map one-hot encoded and scaled features back to original business features
+    grouped_shap: Dict[str, float] = {}
+    for name, val in zip(transformed_feature_names, shap_vals):
+        clean = name.replace("num__", "").replace("cat__", "")
+        if clean.startswith("Category_"):
+            orig = "Category"
+        elif clean.startswith("Region_"):
+            orig = "Region"
+        else:
+            orig = clean
+        grouped_shap[orig] = grouped_shap.get(orig, 0.0) + float(val)
+
+    # 3. Build user-friendly feature explanations
+    total_abs_impact = sum(abs(v) for v in grouped_shap.values()) or 1.0
+    feature_contributions = []
+    for feat_name, contrib in grouped_shap.items():
+        inp_val = input_df[feat_name].iloc[0] if feat_name in input_df.columns else ""
+        if feat_name == "Discount":
+            display_val = f"{float(inp_val) * 100:.0f}%"
+        elif feat_name == "Quantity":
+            display_val = f"{int(inp_val)} units"
+        else:
+            display_val = str(inp_val)
+
+        if contrib > 0.01:
+            direction = "increased"
+            interpretation = f"Pushed sales prediction ${abs(contrib):,.2f} above baseline"
+        elif contrib < -0.01:
+            direction = "decreased"
+            interpretation = f"Pulled sales prediction ${abs(contrib):,.2f} below baseline"
+        else:
+            direction = "neutral"
+            interpretation = "Negligible impact on sales prediction relative to baseline"
+
+        feature_contributions.append({
+            "feature": feat_name,
+            "input_value": display_val,
+            "contribution": round(float(contrib), 2),
+            "direction": direction,
+            "interpretation": interpretation,
+            "percentage_impact": round((abs(contrib) / total_abs_impact) * 100.0, 1),
+        })
+
+    # Sort contributions by absolute impact (highest driver first)
+    feature_contributions.sort(key=lambda x: abs(x["contribution"]), reverse=True)
+
+    additive_sum = round(base_val + sum(grouped_shap.values()), 2)
+    is_additive_exact = abs(additive_sum - raw_pred) < 0.10
+
+    return {
+        "predicted_sales": clamped_pred,
+        "base_value": round(base_val, 2),
+        "feature_contributions": feature_contributions,
+        "raw_transformed_contributions": raw_contributions,
+        "additive_sum": additive_sum,
+        "is_additive_exact": is_additive_exact,
+        "explainer_type": explainer_type,
+        "success": True,
+    }
+
+
+def create_shap_waterfall_chart(
+    base_value: float,
+    feature_contributions: List[Dict[str, Any]],
+    predicted_sales: float,
+    model_name: str = "Trained Model",
+) -> go.Figure:
+    """
+    Create Plotly Waterfall diagram showing step-by-step SHAP attributions from base to prediction.
+    """
+    if not feature_contributions:
+        fig = go.Figure()
+        fig.update_layout(title="No SHAP attribution data available")
+        return fig
+
+    # Top drivers (up to 7)
+    top_features = feature_contributions[:7]
+    names = ["Baseline Expectation"] + [f"{f['feature']} ({f['input_value']})" for f in top_features] + ["Final Prediction"]
+    measures = ["absolute"] + ["relative"] * len(top_features) + ["total"]
+    values = [base_value] + [f["contribution"] for f in top_features] + [predicted_sales]
+
+    fig = go.Figure(
+        go.Waterfall(
+            name="SHAP Attribution",
+            orientation="v",
+            measure=measures,
+            x=names,
+            y=values,
+            textposition="outside",
+            text=[f"${v:,.2f}" for v in values],
+            connector={"line": {"color": "#a0aec0"}},
+            decreasing={"marker": {"color": "#e53e3e"}},
+            increasing={"marker": {"color": "#38a169"}},
+            totals={"marker": {"color": "#3182ce"}},
+        )
+    )
+
+    fig.update_layout(
+        title=f"<b>SHAP Prediction Waterfall Attribution ({model_name})</b>",
+        yaxis_title="Sales Impact ($)",
+        template="plotly_white",
+        margin=dict(l=40, r=40, t=50, b=40),
+    )
+    return fig
+
+
+def compare_scenarios_prediction(
+    model: Pipeline,
+    scenario_a: Union[Dict[str, Any], pd.DataFrame],
+    scenario_b: Union[Dict[str, Any], pd.DataFrame],
+    background_data: Optional[pd.DataFrame] = None,
+) -> Dict[str, Any]:
+    """
+    Compares two business scenarios side by side using the same fitted regression model and SHAP explainer.
+
+    Evaluates:
+    - Predicted sales for Scenario A and Scenario B.
+    - Absolute difference (y_hat_B - y_hat_A) and percentage difference.
+    - Feature-by-feature input changes and SHAP attribution shifts (Delta phi_i = phi_{B, i} - phi_{A, i}).
+    - Verifies exact additivity of the difference: sum(Delta phi_i) == Delta y_hat.
+    """
+    exp_a = explain_prediction(model, scenario_a, background_data=background_data)
+    exp_b = explain_prediction(model, scenario_b, background_data=background_data)
+
+    pred_a = float(exp_a["predicted_sales"])
+    pred_b = float(exp_b["predicted_sales"])
+    abs_diff = round(pred_b - pred_a, 2)
+    pct_diff = round(((pred_b - pred_a) / pred_a) * 100.0, 2) if abs(pred_a) > 1e-6 else 0.0
+
+    # Build feature-level comparison
+    a_dict = {item["feature"]: item for item in exp_a["feature_contributions"]}
+    b_dict = {item["feature"]: item for item in exp_b["feature_contributions"]}
+
+    all_features = ["Category", "Region", "Quantity", "Discount", "Month", "Quarter", "DayOfWeek"]
+    for k in list(a_dict.keys()) + list(b_dict.keys()):
+        if k not in all_features:
+            all_features.append(k)
+
+    feature_comparisons = []
+    changed_count = 0
+    diff_sum = 0.0
+
+    for feat in all_features:
+        item_a = a_dict.get(feat, {"input_value": "-", "contribution": 0.0})
+        item_b = b_dict.get(feat, {"input_value": "-", "contribution": 0.0})
+
+        val_a = str(item_a["input_value"])
+        val_b = str(item_b["input_value"])
+        is_changed = (val_a != val_b)
+        if is_changed:
+            changed_count += 1
+
+        contrib_a = float(item_a["contribution"])
+        contrib_b = float(item_b["contribution"])
+        diff_contrib = round(contrib_b - contrib_a, 2)
+        diff_sum += diff_contrib
+
+        if diff_contrib > 0.01:
+            direction = "increased"
+            if is_changed:
+                interpretation = f"Changing {feat} from {val_a} to {val_b} increased sales attribution by +${abs(diff_contrib):,.2f}"
+            else:
+                interpretation = f"Feature {feat} attribution shifted by +${abs(diff_contrib):,.2f} due to model non-linear interactions"
+        elif diff_contrib < -0.01:
+            direction = "decreased"
+            if is_changed:
+                interpretation = f"Changing {feat} from {val_a} to {val_b} reduced sales attribution by -${abs(diff_contrib):,.2f}"
+            else:
+                interpretation = f"Feature {feat} attribution shifted by -${abs(diff_contrib):,.2f} due to model non-linear interactions"
+        else:
+            direction = "unchanged"
+            if is_changed:
+                interpretation = f"{feat} changed from {val_a} to {val_b} with negligible shift in sales attribution"
+            else:
+                interpretation = f"Unchanged ({val_a}), yielding identical attribution in both scenarios"
+
+        feature_comparisons.append({
+            "feature": feat,
+            "scenario_a_value": val_a,
+            "scenario_b_value": val_b,
+            "is_changed": is_changed,
+            "scenario_a_contribution": round(contrib_a, 2),
+            "scenario_b_contribution": round(contrib_b, 2),
+            "contribution_difference": diff_contrib,
+            "direction": direction,
+            "interpretation": interpretation,
+        })
+
+    # Sort comparisons: changed features first, then by absolute contribution difference descending
+    feature_comparisons.sort(key=lambda x: (not x["is_changed"], -abs(x["contribution_difference"])))
+
+    is_diff_additive = abs(diff_sum - abs_diff) < 0.15
+
+    return {
+        "scenario_a": exp_a,
+        "scenario_b": exp_b,
+        "predicted_sales_a": pred_a,
+        "predicted_sales_b": pred_b,
+        "absolute_difference": abs_diff,
+        "percentage_difference": pct_diff,
+        "changed_features_count": changed_count,
+        "feature_comparisons": feature_comparisons,
+        "is_difference_additive_exact": is_diff_additive,
+        "explainer_type": exp_a["explainer_type"],
+        "base_value": exp_a["base_value"],
+        "success": True,
+        "disclaimer": (
+            "Scenario comparisons quantify mathematical differences in model predictions and SHAP attributions. "
+            "They do not prove real-world causality or guarantee that business interventions will produce observed changes."
+        ),
+    }
+
+
