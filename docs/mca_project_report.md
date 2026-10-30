@@ -187,7 +187,8 @@ The entire four-tier system is verified through an exhaustive test-driven qualit
 | 3.4.3 | Entity-Relationship (ER) Architecture Diagram | 40 |
 | 3.5 | Security Architecture: JWT Authentication and Multi-Tenant Isolation | 42 |
 | 3.6 | API Architecture and Inter-Service Communication Contracts | 44 |
-| **CHAPTER 4** | **CORE COMPUTATIONAL MODULES AND METHODOLOGIES** | **47** |
+| 3.7 | Representative Enterprise Source Code Listings | 46 |
+| **CHAPTER 4** | **CORE COMPUTATIONAL MODULES AND METHODOLOGIES** | **52** |
 | 4.1 | Module 1: Data Ingestion and Schema Integrity Validation (`validator.py`) | 47 |
 | 4.2 | Module 2: Exploratory Data Analysis Engine (`eda.py`) | 50 |
 | 4.3 | Module 3: Customer Segmentation Engine (`segmentation.py`) | 53 |
@@ -261,12 +262,29 @@ The entire four-tier system is verified through an exhaustive test-driven qualit
 | Figure 4.5 | Side-by-Side What-If Scenario Comparison Workflow | 68 |
 | Figure 5.1 | Margin Compression Curve Across Increasing Discount Tiers | 85 |
 | Figure 5.2 | 2D PCA Customer Cluster Distribution Scatter Plot | 89 |
-| Figure 5.3 | Application Screenshot: Data Ingestion and Integrity Validation | 108 |
-| Figure 5.4 | Application Screenshot: Exploratory Data Analysis & Margin Elasticity | 109 |
-| Figure 5.5 | Application Screenshot: Customer Segmentation & 2D PCA Cluster Map | 110 |
-| Figure 5.6 | Application Screenshot: Tri-Model Performance Comparison | 111 |
-| Figure 5.7 | Application Screenshot: SHAP Explainable AI Feature Waterfall | 112 |
-| Figure 5.8 | Application Screenshot: Side-by-Side What-If Scenario Comparison | 113 |
+| Figure 5.3 | Application Screenshot: Enterprise Authentication & Login Portal | 108 |
+| Figure 5.4 | Application Screenshot: Multi-Tenant Dataset Management & Ingestion Portal | 109 |
+| Figure 5.5 | Application Screenshot: Exploratory Data Analysis & Margin Elasticity Dashboard | 110 |
+| Figure 5.6 | Application Screenshot: Unsupervised Customer Segmentation & 2D PCA Cluster Map | 111 |
+| Figure 5.7 | Application Screenshot: Supervised Sales Quote Simulation & SHAP Explainable AI Waterfall | 112 |
+| Figure 5.8 | Application Screenshot: Tri-Model Comparative Machine Learning Benchmark | 113 |
+| Figure 5.9 | Application Screenshot: Side-by-Side What-If Scenario Counterfactual Simulator | 114 |
+| Figure 5.10 | Application Screenshot: Explainable Business Decision Support Insights Engine | 115 |
+
+---
+
+### LIST OF CODE LISTINGS
+
+| Listing No. | Title | Page No. |
+| :--- | :--- | :--- |
+| Listing 3.1 | Next.js Typed REST API Service Client (`frontend/lib/api.ts`) | 47 |
+| Listing 3.2 | Spring Boot Enterprise Analytics REST Controller (`AnalyticsController.java`) | 48 |
+| Listing 3.3 | Spring Security Stateless JWT Filter (`JwtAuthenticationFilter.java`) | 50 |
+| Listing 3.4 | Flyway Versioned Database Migration Scripts (`V1__init_schema.sql` & `V3`) | 51 |
+| Listing 4.1 | FastAPI Asynchronous Microservice Route Handler (`api/routes/prediction.py`) | 66 |
+| Listing 4.2 | SHAP TreeExplainer Attribution Engine & Exact Additive Proof (`src/prediction.py`) | 70 |
+| Listing 4.3 | Next.js Interactive Reactive Quote Simulation Component (`predictions/page.tsx`) | 80 |
+| Listing 5.1 | Multi-Tier End-to-End Automated API Verification Suite (`test_all_apis.cjs`) | 86 |
 
 ---
 
@@ -432,7 +450,8 @@ BizInsightIQ strictly enforces an **out-of-time chronological 80/20 train/test s
 As machine learning systems transition into mission-critical business quoting, the "black-box" dilemma becomes a primary barrier to adoption. Stakeholders reject predictions when the underlying rationale cannot be audited.
 
 To solve this, Lundberg and Lee (2017) formulated **SHAP (Shapley Additive exPlanations)**, uniting cooperative game theory (Shapley, 1953) with local feature attributions. SHAP assigns each feature an attribution value $\phi_i$ representing its marginal contribution to the prediction across all possible feature subsets $S \subseteq F \setminus \{i\}$:
-$$\phi_i(x) = \sum_{S \subseteq F \setminus \{i\}} rac{|S|!(|F| - |S| - 1)!}{|F|!} \left[ f_x(S \cup \{i\}) - f_x(S) ight]$$
+$$\phi_i(x) = \sum_{S \subseteq F \setminus \{i\}} rac{|S|!(|F| - |S| - 1)!}{|F|!} \left[ f_x(S \cup \{i\}) - f_x(S) 
+ight]$$
 
 SHAP is uniquely grounded in four fundamental mathematical axioms:
 1. **Efficiency (Exact Additivity):** The sum of feature attributions equals the difference between the model prediction $\hat{y}$ and the expected baseline outcome $E[f(x)]$:
@@ -588,11 +607,17 @@ BizInsightIQ persists user credentials, uploaded datasets, validated transaction
 | Table Name | Primary Key | Foreign Keys | Key Columns & Constraints | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
 | **`users`** | `id` (UUID) | None | `username` (UNIQUE), `email` (UNIQUE), `password_hash` (BCrypt), `role` (`ROLE_ADMIN`, `ROLE_ANALYST`, `ROLE_SALES`) | User identity, authentication credentials, and RBAC authorization. |
-| **`datasets`** | `id` (UUID) | `user_id` $ightarrow$ `users(id)` (CASCADE) | `name`, `original_filename`, `storage_key`, `status` (`PENDING`, `VALIDATED`, `FAILED`), `total_rows`, `total_columns`, `is_valid` | Metadata, ownership, and validation status of uploaded sales files. |
-| **`sales_transactions`**| `id` (BIGSERIAL)| `dataset_id` $ightarrow$ `datasets(id)` (CASCADE)| `order_id`, `customer_id`, `order_date`, `category`, `region`, `quantity` ($\ge 0$), `discount` ($[0, 1]$), `sales` ($\ge 0$), `profit` | Ingested and validated individual sales transaction line items. |
-| **`segmentation_runs`** | `id` (UUID) | `dataset_id` $ightarrow$ `datasets(id)` (CASCADE)| `k_clusters` ($[2, 10]$), `silhouette_score`, `inertia`, `algorithm_version`, `created_at` | Historical records of executed K-Means segmentation runs and quality metrics. |
-| **`customer_clusters`** | `id` (BIGSERIAL)| `segmentation_run_id` $ightarrow$ `segmentation_runs(id)` (CASCADE)| `customer_id`, `cluster_id`, `recency` ($\ge 0$), `frequency` ($\ge 1$), `monetary_value` ($\ge 0$), `total_profit`, UNIQUE(`segmentation_run_id`, `customer_id`) | Individual customer cluster assignments and computed RFM+D metrics per run. |
-| **`quote_simulations`** | `id` (UUID) | `user_id` $ightarrow$ `users(id)`, `dataset_id` $ightarrow$ `datasets(id)` (SET NULL)| `category`, `region`, `quantity` ($\ge 1$), `discount` ($[0, 1]$), `predicted_sales` ($\ge 0$), `model_version`, `created_at` | Persisted sales quote simulations evaluated through the predictive engine. |
+| **`datasets`** | `id` (UUID) | `user_id` $
+ightarrow$ `users(id)` (CASCADE) | `name`, `original_filename`, `storage_key`, `status` (`PENDING`, `VALIDATED`, `FAILED`), `total_rows`, `total_columns`, `is_valid` | Metadata, ownership, and validation status of uploaded sales files. |
+| **`sales_transactions`**| `id` (BIGSERIAL)| `dataset_id` $
+ightarrow$ `datasets(id)` (CASCADE)| `order_id`, `customer_id`, `order_date`, `category`, `region`, `quantity` ($\ge 0$), `discount` ($[0, 1]$), `sales` ($\ge 0$), `profit` | Ingested and validated individual sales transaction line items. |
+| **`segmentation_runs`** | `id` (UUID) | `dataset_id` $
+ightarrow$ `datasets(id)` (CASCADE)| `k_clusters` ($[2, 10]$), `silhouette_score`, `inertia`, `algorithm_version`, `created_at` | Historical records of executed K-Means segmentation runs and quality metrics. |
+| **`customer_clusters`** | `id` (BIGSERIAL)| `segmentation_run_id` $
+ightarrow$ `segmentation_runs(id)` (CASCADE)| `customer_id`, `cluster_id`, `recency` ($\ge 0$), `frequency` ($\ge 1$), `monetary_value` ($\ge 0$), `total_profit`, UNIQUE(`segmentation_run_id`, `customer_id`) | Individual customer cluster assignments and computed RFM+D metrics per run. |
+| **`quote_simulations`** | `id` (UUID) | `user_id` $
+ightarrow$ `users(id)`, `dataset_id` $
+ightarrow$ `datasets(id)` (SET NULL)| `category`, `region`, `quantity` ($\ge 1$), `discount` ($[0, 1]$), `predicted_sales` ($\ge 0$), `model_version`, `created_at` | Persisted sales quote simulations evaluated through the predictive engine. |
 | **`flyway_schema_history`**| `installed_rank` (INT)| None | `version`, `description`, `type`, `script`, `checksum`, `installed_by`, `installed_on`, `success` | Automated Flyway migration audit log ensuring schema version control. |
 
 ### 3.4.2 Flyway Migration Strategy and Version History
@@ -725,7 +750,243 @@ BizInsightIQ enforces strictly typed REST API contracts between the tiers. Table
 | `/api/v1/datasets/{id}/analytics/predictions` | `/api/v1/predictions/predict` | POST | Single scenario parameters | `{ predicted_sales, model_version }` | Generates a single sales quote. |
 | `/api/v1/datasets/{id}/analytics/predictions/explain` | `/api/v1/predictions/explain` | POST | Single quote inputs | `{ predicted_sales, base_value, feature_contributions, is_additive_exact }` | Generates SHAP local feature attributions and additive proof. |
 | `/api/v1/datasets/{id}/analytics/predictions/compare` | `/api/v1/predictions/compare` | POST | `{ scenario_a: {...}, scenario_b: {...}, model_type }` | `{ prediction_a, prediction_b, absolute_difference, percentage_difference, attribution_shifts, is_difference_additive_exact }` | Side-by-side What-If scenario counterfactual comparison. |
-| `/api/v1/datasets/{id}/analytics/insights` | `/api/v1/insights` | GET | `datasetId` path variable | `{ insights: [ { rule_id, domain, priority, evidence, directive } ] }` | Synthesizes 8 actionable business recommendations. |
+| `/api/v1/datasets/{id}/analytics/insights` | `/api/v1/insights` | GET | `datasetId` path variable | `{ summary, insights: [ { rule_id, domain, severity, recommendation } ] }` | Synthesizes 9 actionable business recommendations. |
+
+## 3.7 Representative Enterprise Source Code Listings
+
+The following annotated listings demonstrate the production-grade separation of concerns across BizInsightIQ's presentation, security, and persistence layers.
+
+### Listing 3.1: Next.js Typed REST API Service Client (`frontend/lib/api.ts`)
+The Next.js client defines strongly typed asynchronous methods injecting Bearer JWT tokens and proxying all analytics requests through the Spring Boot enterprise gateway.
+
+```typescript
+/**
+ * BizInsightIQ Enterprise API Client
+ * Manages Bearer token injection, typed response deserialization, and gateway routing.
+ */
+import {
+  AuthResponse,
+  Dataset,
+  EdaResponse,
+  SegmentationResponse,
+  QuoteSimulationResponse,
+  PredictionExplanationResponse,
+  ScenarioComparisonResponse,
+  InsightsResponse,
+} from './types';
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+
+async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('bizinsightiq_jwt') : null;
+  const headers = new Headers(options.headers || {});
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const response = await fetch(url, { ...options, headers });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `HTTP Error ${response.status}: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export const analyticsApi = {
+  getEda: (datasetId: string): Promise<EdaResponse> =>
+    fetchWithAuth<EdaResponse>(`${BASE_URL}/datasets/${datasetId}/analytics/eda`),
+
+  runSegmentation: (datasetId: string, params: { nClusters: number; randomState: number; evaluateCandidates: boolean }): Promise<SegmentationResponse> =>
+    fetchWithAuth<SegmentationResponse>(`${BASE_URL}/datasets/${datasetId}/analytics/segmentation`, {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+
+  simulateQuote: (datasetId: string, quote: any): Promise<QuoteSimulationResponse> =>
+    fetchWithAuth<QuoteSimulationResponse>(`${BASE_URL}/datasets/${datasetId}/analytics/predictions`, {
+      method: 'POST',
+      body: JSON.stringify(quote),
+    }),
+
+  compareScenarios: (datasetId: string, comparisonReq: any): Promise<ScenarioComparisonResponse> =>
+    fetchWithAuth<ScenarioComparisonResponse>(`${BASE_URL}/datasets/${datasetId}/analytics/predictions/compare`, {
+      method: 'POST',
+      body: JSON.stringify(comparisonReq),
+    }),
+
+  getInsights: (datasetId: string, filter?: { severity?: string }): Promise<InsightsResponse> => {
+    const query = filter?.severity ? `?severity=${filter.severity}` : '';
+    return fetchWithAuth<InsightsResponse>(`${BASE_URL}/datasets/${datasetId}/analytics/insights${query}`);
+  },
+};
+```
+
+### Listing 3.2: Spring Boot Enterprise Analytics REST Controller (`AnalyticsController.java`)
+The backend REST controller validates caller identities, enforces multi-tenant dataset ownership, and orchestrates calls between the database and the downstream Python ML microservice.
+
+```java
+package com.bizinsightiq.web.controller;
+
+import com.bizinsightiq.client.dto.*;
+import com.bizinsightiq.domain.model.SegmentationRun;
+import com.bizinsightiq.security.UserPrincipal;
+import com.bizinsightiq.service.AnalyticsOrchestrationService;
+import com.bizinsightiq.web.dto.*;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1/datasets/{datasetId}/analytics")
+public class AnalyticsController {
+
+    private final AnalyticsOrchestrationService analyticsService;
+
+    public AnalyticsController(AnalyticsOrchestrationService analyticsService) {
+        this.analyticsService = analyticsService;
+    }
+
+    /**
+     * Executes K-Means customer segmentation and persists cluster assignments.
+     */
+    @PostMapping("/segmentation")
+    public ResponseEntity<SegmentationRunResponse> runSegmentation(
+            @PathVariable("datasetId") UUID datasetId,
+            @Valid @RequestBody(required = false) RunSegmentationRequest request,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        RunSegmentationRequest req = request != null ? request : new RunSegmentationRequest(4, 42, true);
+        SegmentationRunResponse response = analyticsService.runCustomerSegmentation(datasetId, req, principal);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Side-by-side What-If scenario counterfactual comparison.
+     */
+    @PostMapping("/predictions/compare")
+    public ResponseEntity<ScenarioComparisonResponseDto> compareScenarios(
+            @PathVariable("datasetId") UUID datasetId,
+            @Valid @RequestBody ScenarioComparisonRequestDto request,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        ScenarioComparisonResponseDto response = analyticsService.compareScenarios(datasetId, request, principal);
+        return ResponseEntity.ok(response);
+    }
+}
+```
+
+### Listing 3.3: Spring Security Stateless JWT Filter (`JwtAuthenticationFilter.java`)
+Intercepts every incoming HTTP request, validates the cryptographic signature of the Bearer token, and binds the verified user identity to Spring's `SecurityContext`.
+
+```java
+package com.bizinsightiq.security;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.UUID;
+
+@Component
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final JwtTokenProvider tokenProvider;
+    private final CustomUserDetailsService customUserDetailsService;
+
+    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider, CustomUserDetailsService userDetailsService) {
+        this.tokenProvider = tokenProvider;
+        this.customUserDetailsService = userDetailsService;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+        String jwt = getJwtFromRequest(request);
+
+        if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+            UUID userId = tokenProvider.getUserIdFromJWT(jwt);
+            UserDetails userDetails = customUserDetailsService.loadUserById(userId);
+
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+        }
+        filterChain.doFilter(request, response);
+    }
+
+    private String getJwtFromRequest(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
+    }
+}
+```
+
+### Listing 3.4: Flyway Versioned Database Migration Scripts (`V1` and `V3`)
+Demonstrates reproducible DDL version control across PostgreSQL schema migrations.
+
+```sql
+-- V1__init_schema.sql: Initial Core Tables and Multi-Tenant Schema
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'ROLE_ANALYST',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE datasets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    storage_key VARCHAR(500) NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'UPLOADED',
+    total_rows INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- V3__what_if_analysis.sql: Dedicated Audit Schema for Quote Simulations
+CREATE TABLE quote_simulations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    dataset_id UUID REFERENCES datasets(id) ON DELETE SET NULL,
+    category VARCHAR(50) NOT NULL,
+    region VARCHAR(50) NOT NULL,
+    quantity INTEGER NOT NULL,
+    discount NUMERIC(5, 4) NOT NULL,
+    predicted_sales NUMERIC(12, 2) NOT NULL,
+    model_version VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_quote_simulations_user_id ON quote_simulations(user_id);
+CREATE INDEX idx_quote_simulations_dataset_id ON quote_simulations(dataset_id);
+```
 
 ---
 
@@ -828,6 +1089,36 @@ The predictive engine provides pre-transaction sales quoting while strictly prev
    - **Model 3 — XGBoost Regressor:** `xgboost.XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42)`.
 5. **Persistent Dataset-Keyed Model Registry:** Fitted pipelines and preprocessors are serialized and cached in-memory and on disk keyed by `(dataset_id, model_type)`, ensuring instantaneous inference without re-training on subsequent quotes.
 
+### Listing 4.1: FastAPI Asynchronous Microservice Route Handler (`api/routes/prediction.py`)
+Demonstrates the high-performance asynchronous endpoint managing scenario comparison and model inference dispatch.
+
+```python
+@router.post("/compare", response_model=ScenarioComparisonResponse)
+async def compare_scenarios_endpoint(
+    request: ScenarioComparisonRequest,
+    file: Optional[UploadFile] = File(None),
+    dataset_id: Optional[str] = Form(None),
+):
+    # Side-by-side What-If scenario counterfactual comparison with SHAP difference decomposition
+    dataset_key = dataset_id or "default"
+    models = _MODEL_REGISTRY.get(dataset_key) or _MODEL_REGISTRY.get("latest")
+
+    if not models or request.model_type not in models:
+        df = get_dataset_or_default(file, dataset_id)
+        train_res = train_and_evaluate_models(df)
+        register_trained_models(dataset_key, train_res["models"])
+        models = train_res["models"]
+
+    pipeline = models[request.model_type]
+    comparison_dict = compare_scenarios_prediction(
+        pipeline=pipeline,
+        scenario_a_dict=request.scenario_a.dict(),
+        scenario_b_dict=request.scenario_b.dict(),
+        model_type=request.model_type,
+    )
+    return ScenarioComparisonResponse(**comparison_dict)
+```
+
 Figure 4.3 illustrates the predictive training and quoting lifecycle.
 
 ```
@@ -865,6 +1156,47 @@ To transform black-box machine learning into an auditable enterprise tool, BizIn
 4. **Mathematical Verification of Additivity:** Verifies that the sum of attributions plus the baseline exactly matches the model's prediction:
    $$\hat{y} \equiv E[f(x)] + \sum_{i=1}^M \phi_i$$
    The engine computes residual error $\epsilon = |\hat{y} - (E[f(x)] + \sum \phi_i)|$ and asserts $\epsilon < 0.01$, setting `is_additive_exact = true`.
+
+### Listing 4.2: SHAP TreeExplainer Attribution Engine & Exact Additive Proof (`src/prediction.py`)
+Demonstrates exact Shapley feature attribution extraction and mathematical additivity verification.
+
+```python
+def explain_prediction(pipeline: Pipeline, scenario_dict: dict, model_type: str = "random_forest") -> dict:
+    model = pipeline.named_steps["regressor"]
+    preprocessor = pipeline.named_steps["preprocessor"]
+
+    X_single = pd.DataFrame([scenario_dict])
+    X_trans = preprocessor.transform(X_single)
+
+    if model_type in ("random_forest", "xgboost"):
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(X_trans)
+        base_val = explainer.expected_value
+        if isinstance(base_val, np.ndarray):
+            base_val = float(base_val[0])
+        else:
+            base_val = float(base_val)
+    else:
+        explainer = shap.LinearExplainer(model, X_trans)
+        shap_values = explainer.shap_values(X_trans)
+        base_val = float(explainer.expected_value)
+
+    pred_val = float(model.predict(X_trans)[0])
+    shap_row = shap_values[0] if isinstance(shap_values, list) else shap_values[0]
+    shap_sum = float(np.sum(shap_row))
+    additive_sum = base_val + shap_sum
+
+    # Floating point tolerance test for 100% exact mathematical additivity
+    is_additive_exact = bool(np.isclose(pred_val, additive_sum, atol=1e-2))
+
+    return {
+        "predicted_sales": round(pred_val, 2),
+        "base_value": round(base_val, 2),
+        "additive_sum": round(additive_sum, 2),
+        "is_additive_exact": is_additive_exact,
+        "feature_contributions": extract_formatted_contributions(shap_row, preprocessor, scenario_dict),
+    }
+```
 
 Figure 4.4 illustrates the SHAP explainability workflow.
 
@@ -1189,37 +1521,47 @@ Table 5.8 details the eight automated directives generated by the prescriptive i
 
 ## 5.11 Application Screenshots and User Interface Walkthrough
 
-Figures 5.3 through 5.8 document the visual interface evidence captured from the running Next.js enterprise web application (`http://localhost:3001`).
+Figures 5.3 through 5.10 document the visual interface evidence captured live from the running Next.js enterprise web application (`http://localhost:3001`), showcasing authentic multi-tier data flow between the Next.js portal, Spring Boot 3 backend, PostgreSQL 17 database, and FastAPI AI/ML microservice.
 
-### Figure 5.3: Application Screenshot — Data Ingestion & Integrity Validation
-The data ingestion interface allows analysts to upload transactional sales files, performing pre-flight schema contract checks, range assertions, and IQR outlier scans in real time.
+### Figure 5.3: Application Screenshot — Enterprise Authentication & Login Portal
+The enterprise login portal enforces stateless JSON Web Token (JWT) issuance. Users authenticate via BCrypt password verification, receiving user profiles and role authorizations (`ROLE_ANALYST`, `ROLE_ADMIN`).
 
-![Tab 1: Data Ingestion and Validation](screenshots/01_data_ingestion_and_validation.png)
+![Figure 5.3: Application Screenshot — Enterprise Authentication & Login Portal](screenshots/01_live_login.png)
 
-### Figure 5.4: Application Screenshot — Exploratory Data Analysis & Margin Elasticity
-Surfaces executive KPI summary cards, product category revenue shares, regional sales maps, and the diagnostic margin compression curve across tiered discount brackets.
+### Figure 5.4: Application Screenshot — Multi-Tenant Dataset Management & Ingestion Portal
+The dataset ingestion dashboard displays active PostgreSQL-persisted datasets, execution statuses (`VALIDATED`, `FAILED`), row/column counts, and dataset selection controls. Uploaded CSVs are validated in real time against strict schema contracts.
 
-![Tab 2: Exploratory Data Analysis](screenshots/02_exploratory_data_analysis.png)
+![Figure 5.4: Application Screenshot — Multi-Tenant Dataset Management & Ingestion Portal](screenshots/02_live_dashboard.png)
 
-### Figure 5.5: Application Screenshot — Customer Segmentation & 2D PCA Cluster Map
-Visualizes the four customer personas extracted via RFM+D K-Means clustering, rendering cluster centroid summary cards and the interactive 2D PCA projection scatter plot.
+### Figure 5.5: Application Screenshot — Exploratory Data Analysis & Margin Elasticity Dashboard
+Visualizes executive KPI summary cards (Total Sales ₹15,22,871.14, Total Profit ₹3,40,849.66, Profit Margin 22.4%), 24-month chronological sales and profit trajectories, product category revenue shares, and regional territory breakdowns.
 
-![Tab 3: Customer Segmentation](screenshots/03_customer_segmentation.png)
+![Figure 5.5: Application Screenshot — Exploratory Data Analysis & Margin Elasticity Dashboard](screenshots/03_live_eda.png)
 
-### Figure 5.6: Application Screenshot — Tri-Model Performance Comparison
-Documents the chronological train/test split verification, comparative metric benchmarking across Linear Regression, Random Forest, and XGBoost, and residual error distributions.
+### Figure 5.6: Application Screenshot — Unsupervised Customer Segmentation & 2D PCA Cluster Map
+Visualizes the four behavioral customer personas discovered by K-Means ($k=4$, Silhouette Score $S = 0.358$, Inertia $314.8$), detailing Recency, Frequency, Monetary spend, and profit margins for each group, alongside the 2D PCA variance projection (71.0% variance explained).
 
-![Tab 4: Sales Prediction](screenshots/04_sales_prediction.png)
+![Figure 5.6: Application Screenshot — Unsupervised Customer Segmentation & 2D PCA Cluster Map](screenshots/04_live_segmentation.png)
 
-### Figure 5.7: Application Screenshot — SHAP Explainable AI Feature Waterfall
-Renders local instance Shapley feature attributions, displaying baseline expected value ($1,261.08), directional push/pull waterfall bars, and the mathematical additivity verification badge.
+### Figure 5.7: Application Screenshot — Supervised Sales Quote Simulation & SHAP Explainable AI Waterfall
+Documents the pre-transaction quote simulation interface. Displays the estimated gross sales (₹2,141.83), the database persistence confirmation, baseline expected value (₹1,261.08), directional SHAP push/pull attributions, and the exact mathematical additivity badge (`Base + Sum(SHAP) = Prediction`).
 
-![Tab 5: Business Insights and Recommendations](screenshots/05_business_insights_and_recommendations.png)
+![Figure 5.7: Application Screenshot — Supervised Sales Quote Simulation & SHAP Explainable AI Waterfall](screenshots/05a_live_predictions_shap.png)
 
-### Figure 5.8: Application Screenshot — Side-by-Side What-If Scenario Comparison
-Documents the dual-quote counterfactual simulation interface, displaying Scenario A baseline, Scenario B counterfactual, net prediction difference, and feature attribution shifts.
+### Figure 5.8: Application Screenshot — Tri-Model Machine Learning Comparative Benchmark
+Documents the chronological train/test split verification and comparative performance table across Linear Regression (MAE ₹638.70, $R^2=0.649$), Random Forest (MAE ₹522.76, $R^2=0.632$), and XGBoost (MAE ₹562.77, $R^2=0.591$).
 
-![Tab 6: System Architecture and Roadmap](screenshots/06_system_architecture_and_roadmap.png)
+![Figure 5.8: Application Screenshot — Tri-Model Comparative Machine Learning Benchmark](screenshots/05c_live_predictions_whatif.png)
+
+### Figure 5.9: Application Screenshot — Side-by-Side What-If Scenario Counterfactual Simulator
+Documents the dual-quote counterfactual simulation interface, allowing pricing analysts to configure Scenario A (Baseline 10% discount) alongside Scenario B (Counterfactual 20% discount) to audit price elasticity, margin shift, and feature attributions before finalizing quotes.
+
+![Figure 5.9: Application Screenshot — Side-by-Side What-If Scenario Counterfactual Simulator](screenshots/05c_live_predictions_whatif.png)
+
+### Figure 5.10: Application Screenshot — Explainable Business Decision Support Insights Engine
+Displays the deterministic decision support cards generated across 9 business rules, featuring severity filters (All, Critical Alerts: 1, Warnings: 6, Informational: 2), structured empirical evidence, actionable recommendations, and explicit analytical limitation disclosures.
+
+![Figure 5.10: Application Screenshot — Explainable Business Decision Support Insights Engine](screenshots/06_live_insights.png)
 
 ## 5.12 Objective Achievement Matrix
 

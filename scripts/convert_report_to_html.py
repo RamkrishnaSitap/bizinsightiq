@@ -424,6 +424,92 @@ def build_full_html(body_html):
 """
 
 
+def export_pdf_cdp():
+    import subprocess
+    import json
+    import time
+    import urllib.request
+    import asyncio
+    import websockets
+
+    edge_exe = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+    if not os.path.exists(edge_exe):
+        print("Microsoft Edge not found at default path, skipping PDF export.")
+        return
+
+    port = 9222
+    user_data_dir = os.path.abspath(r"C:\Users\Lenovo\.gemini\antigravity\brain\f7d14055-63ae-433e-9a8a-f4528e783b4a\scratch\edge_profile")
+    html_uri = f"file:///{HTML_FILE.replace(os.sep, '/')}"
+    out_pdf = os.path.join(DOCS_DIR, "mca_project_report_final.pdf")
+    default_pdf = os.path.join(DOCS_DIR, "mca_project_report.pdf")
+
+    cmd = [
+        edge_exe,
+        "--headless=new",
+        f"--remote-debugging-port={port}",
+        "--remote-allow-origins=*",
+        f"--user-data-dir={user_data_dir}",
+        "--disable-gpu",
+        "--no-sandbox",
+        "about:blank"
+    ]
+    proc = subprocess.Popen(cmd)
+    time.sleep(2)
+
+    try:
+        req = urllib.request.urlopen(f"http://127.0.0.1:{port}/json")
+        targets = json.loads(req.read().decode("utf-8"))
+        page_targets = [t for t in targets if t.get("type") == "page"]
+        ws_url = page_targets[0]["webSocketDebuggerUrl"]
+
+        async def run_print():
+            async with websockets.connect(ws_url, max_size=100*1024*1024) as ws:
+                mid = 2001
+                async def send(method, params=None):
+                    nonlocal mid
+                    await ws.send(json.dumps({"id": mid, "method": method, "params": params or {}}))
+                    while True:
+                        resp = json.loads(await ws.recv())
+                        if resp.get("id") == mid:
+                            mid += 1
+                            return resp
+
+                await send("Page.enable")
+                await send("Page.navigate", {"url": html_uri})
+                await asyncio.sleep(5)
+
+                res = await send("Page.printToPDF", {
+                    "printBackground": True,
+                    "paperWidth": 8.27,
+                    "paperHeight": 11.69,
+                    "marginTop": 0.8,
+                    "marginBottom": 0.8,
+                    "marginLeft": 0.8,
+                    "marginRight": 0.8,
+                    "displayHeaderFooter": False,
+                    "preferCSSPageSize": True
+                })
+
+                data = res.get("result", {}).get("data")
+                if data:
+                    pdf_bytes = base64.b64decode(data)
+                    with open(out_pdf, "wb") as f:
+                        f.write(pdf_bytes)
+                    print(f"Successfully compiled PDF: {out_pdf} ({len(pdf_bytes)} bytes)")
+                    try:
+                        with open(default_pdf, "wb") as f:
+                            f.write(pdf_bytes)
+                        print(f"Updated primary PDF: {default_pdf}")
+                    except Exception as e:
+                        print(f"Primary PDF is locked by external viewer; saved as {out_pdf}")
+
+        asyncio.run(run_print())
+    except Exception as e:
+        print(f"PDF export warning: {e}")
+    finally:
+        proc.terminate()
+
+
 def main():
     print(f"Reading markdown from: {MD_FILE}")
     with open(MD_FILE, "r", encoding="utf-8") as f:
@@ -438,7 +524,10 @@ def main():
         f.write(full_html)
 
     print("HTML conversion successful!")
+    print("Exporting academic PDF...")
+    export_pdf_cdp()
 
 
 if __name__ == "__main__":
     main()
+
